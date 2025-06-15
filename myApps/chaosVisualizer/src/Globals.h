@@ -3,3 +3,4 @@
 
 extern int width;
 extern int height;
+extern float ampFromSC;

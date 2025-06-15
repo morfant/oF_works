@@ -7,6 +7,7 @@ void ofApp::setup() {
 	ofSetCircleResolution(32);
 	ofBackground(0);
 	sender.setup(HOST, PORT_OUT);
+	receiver.setup(PORT_IN);
 
 	width = ofGetWidth();
 	height = ofGetHeight();
@@ -17,36 +18,38 @@ void ofApp::setup() {
 	lat_b = 3.0;
 	lat_c = 0.5;
 	lat_d = 0.5;
+	lat_rate = 100;
 	ampLatoo = false;
 	useLines = false;
-	ampFromSC = 0.0f;
+
+	attractorLayer.allocate(width, height, GL_RGBA);
+
+	hiddenImg.load("cloud_0301.jpg");
+	hiddenImg.resize(width, height);
 
 	mover = Mover(ofGetWidth() / 2, ofGetHeight() / 2, 5);
 
-	hiddenImg.load("cloud_0301.jpg");
-	hiddenImg.resize(ofGetWidth(), ofGetHeight());
-
-	grid = Grid(60, 40, ofGetWidth(), ofGetHeight());
+	// grid = Grid(60, 40, width, height);
+	grid = Grid(120, 80, width, height);
 	grid.setFromImage(hiddenImg);
 	grid.reset();
-
-	attractorLayer.allocate(width, height, GL_RGBA);
 
 	blackholes.push_back(Blackhole(ofGetWidth() * 2 / 3, ofGetHeight() / 3, 1));
 
 	// UI
 	gui.setup("GUI");
 
-	gui.add(fSlider[0].setup("INIT_X", init_x, -5, 5));
-	gui.add(fSlider[1].setup("INIT_Y", init_y, -5, 5));
-	gui.add(iSlider.setup("RATE", rate, 10, 48000));
+	gui.add(fSlider[0].setup("INIT_X", lat_x, -5, 5));
+	gui.add(fSlider[1].setup("INIT_Y", lat_y, -5, 5));
+	gui.add(iSlider.setup("LAT_RATE", lat_rate, 10, 48000));
 	fSlider[0].addListener(this, &ofApp::onInitXChanged);
 	fSlider[1].addListener(this, &ofApp::onInitYChanged);
 	iSlider.addListener(this, &ofApp::onRateChanged);
 
-	gui.add(toggle.setup("Amp On", true));
+	gui.add(toggle.setup("Amp On", ampLatoo));
 	toggle.addListener(this, &ofApp::onToggleChanged);
 
+	// Init values
 	sendLatooInit();
 	sendLatooAmpState(ampLatoo);
 }
@@ -58,74 +61,20 @@ void ofApp::update() {
 	applyBlackholeForce();
 
 	for (int i = seeds.size() - 1; i >= 0; --i) {
-		Blackhole * nearest = nullptr;
-		float minDist = FLT_MAX;
-
-		for (auto & b : blackholes) {
-			float d = ofDist(seeds[i].pos.x, seeds[i].pos.y, b.pos.x, b.pos.y);
-			if (d < minDist) {
-				minDist = d;
-				nearest = &b;
-			}
-
-			if (seeds[i].isCollidingWith(b)) {
-				seeds.erase(seeds.begin() + i);
-				goto next_seed;
-			}
-		}
-
-		if (nearest) seeds[i].attract(nearest->pos);
-		seeds[i].update();
-
-		if (seeds[i].revealGridCell(grid, 5)) {
-			seeds.erase(seeds.begin() + i);
-			continue;
-		}
-
-		if (seeds[i].isOffscreen()) {
+		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
 			seeds.erase(seeds.begin() + i);
 		}
-
-	next_seed:;
 	}
+
+	// OSC
+	oscReceive();
 }
 
 //--------------------------------------------------------------
 void ofApp::draw() {
+	hiddenImg.draw(0, 0); // 이미지 그리기
+
 	grid.display();
-
-	attractorLayer.begin();
-	ofClear(0, 0, 0, 0);
-	ofPushMatrix();
-	ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
-	ofSetLineWidth(1.5);
-	ofSetColor(255);
-
-	float x = lat_x, y = lat_y;
-	float prevX = 0, prevY = 0;
-	bool isFirst = true;
-
-	for (int i = 0; i < 1000; ++i) {
-		float nextX = sin(lat_b * y) + lat_c * sin(lat_b * x);
-		float nextY = sin(lat_a * x) + lat_d * sin(lat_a * y);
-		float px = ofMap(nextX, -2, 2, -ofGetWidth() / 2, ofGetWidth() / 2);
-		float py = ofMap(nextY, -2, 2, -ofGetHeight() / 2, ofGetHeight() / 2);
-
-		if (useLines) {
-			if (!isFirst) ofDrawLine(prevX, prevY, px, py);
-		} else {
-			ofDrawCircle(px, py, 1);
-		}
-
-		isFirst = false;
-		prevX = px;
-		prevY = py;
-		x = nextX;
-		y = nextY;
-	}
-
-	ofPopMatrix();
-	attractorLayer.end();
 
 	mover.draw();
 	for (auto & s : seeds)
@@ -133,7 +82,7 @@ void ofApp::draw() {
 	for (auto & b : blackholes)
 		b.display();
 
-	attractorLayer.draw(0, 0);
+	renderAttractor();
 
 	// UI
 	gui.draw();
@@ -141,11 +90,11 @@ void ofApp::draw() {
 	// ---- Debug Info: lat params & FPS ----
 	ofSetColor(255);
 	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 200);
-	ofDrawBitmapString("lat_a: " + ofToString(lat_a, 2), 20, 220);
-	ofDrawBitmapString("lat_b: " + ofToString(lat_b, 2), 20, 240);
-	ofDrawBitmapString("lat_c: " + ofToString(lat_c, 2), 20, 260);
-	ofDrawBitmapString("lat_d: " + ofToString(lat_d, 2), 20, 280);
-	ofDrawBitmapString("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
+	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 220);
+	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 240);
+	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 260);
+	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
+	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
 }
 
 void ofApp::updateParameters() {
@@ -160,40 +109,94 @@ void ofApp::updateParameters() {
 }
 
 void ofApp::applyBlackholeForce() {
-    Blackhole* nearest = nullptr;
-    float minDist = std::numeric_limits<float>::max();
+	Blackhole * nearest = nullptr;
+	float minDist = std::numeric_limits<float>::max();
 
-    for (auto& b : blackholes) {
-        float d = ofDist(mover.pos.x, mover.pos.y, b.pos.x, b.pos.y);
-        if (d < minDist) {
-            minDist = d;
-            nearest = &b;
-        }
-        b.display();  // 만약 display()가 const 함수면, b를 const 참조로 받아야 함
-    }
+	for (auto & b : blackholes) {
+		float d = ofDist(mover.pos.x, mover.pos.y, b.pos.x, b.pos.y);
+		if (d < minDist) {
+			minDist = d;
+			nearest = &b;
+		}
+		b.display(); // 만약 display()가 const 함수면, b를 const 참조로 받아야 함
+	}
 
-    if (nearest != nullptr) {
-        ofVec2f force = nearest->pos - mover.pos;
-        force.normalize();
-        force *= 0.2;
-        mover.applyForce(force);
-    }
+	if (nearest != nullptr) {
+		ofVec2f force = nearest->pos - mover.pos;
+		force.normalize();
+		force *= 0.2;
+		mover.applyForce(force);
+	}
 }
 
+void ofApp::renderAttractor() {
 
+	attractorLayer.begin();
+	ofClear(0, 0, 0, 0);
+	ofPushMatrix();
+	ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
+	ofSetLineWidth(1.5);
+	ofSetColor(255);
+
+	float x = lat_x, y = lat_y;
+	float prevX = 0, prevY = 0;
+	bool isFirst = true;
+
+	for (int i = 0; i < ATTR_ITER_NUM; ++i) {
+		float nextX = sin(lat_b * y) + lat_c * sin(lat_b * x);
+		float nextY = sin(lat_a * x) + lat_d * sin(lat_a * y);
+		float px = ofMap(nextX, -2, 2, -ofGetWidth() / 2, ofGetWidth() / 2);
+		float py = ofMap(nextY, -2, 2, -ofGetHeight() / 2, ofGetHeight() / 2);
+
+		if (useLines) {
+			if (!isFirst) ofDrawLine(prevX, prevY, px, py);
+		} else {
+			ofDrawCircle(px, py, ATTR_RAD + (ampFromSC * 10));
+		}
+
+		isFirst = false;
+		prevX = px;
+		prevY = py;
+		x = nextX;
+		y = nextY;
+	}
+
+	ofPopMatrix();
+	attractorLayer.end();
+	attractorLayer.draw(0, 0);
+}
+
+void ofApp::updateGridFromAmp() {
+	float normAmp = ofClamp(ampFromSC, 0.0f, 1.0f); // 0~1 범위로 정규화
+
+	// 예: mover 위치 기준으로 셀에 값을 매핑
+	// grid.setValueAt(mover.pos.x, mover.pos.y, normAmp);
+
+	// 예: 주변 3x3 영역 셀에도 값 퍼뜨리기 (부드러운 반응)
+	// for (int dx = -1; dx <= 1; dx++) {
+	// 	for (int dy = -1; dy <= 1; dy++) {
+	// 		float x = mover.pos.x + dx * grid.cellW;
+	// 		float y = mover.pos.y + dy * grid.cellH;
+	// 		grid.setValueAt(x, y, normAmp * 0.7f); // 중심보다 약하게
+	// 	}
+	// }
+
+	// (선택) Reveal 형태를 쓰고 싶다면 아래처럼:
+	grid.revealValue(mover.pos.x, mover.pos.y);
+}
 
 void ofApp::onInitXChanged(float & val) {
-	init_x = val;
+	lat_x = val;
 	sendLatooInit();
 }
 
 void ofApp::onInitYChanged(float & val) {
-	init_y = val;
+	lat_y = val;
 	sendLatooInit();
 }
 
 void ofApp::onRateChanged(int & val) {
-	rate = val;
+	lat_rate = val;
 	sendLatooRate();
 }
 
@@ -202,12 +205,11 @@ void ofApp::onToggleChanged(bool & val) {
 
 	sendLatooAmpState(ampLatoo);
 
-	if (!ampLatoo) {
+	if (ampLatoo) {
 		sendLatooParams();
 		sendLatooInit();
 		sendLatooRate();
 	}
-
 }
 
 //--------------------------------------------------------------
@@ -217,7 +219,7 @@ void ofApp::keyPressed(int key) {
 		useLines = !useLines;
 	}
 	if (key == 's') {
-		ofLog() << "Seed released!";
+		// ofLog() << "Seed released!";
 		seeds.push_back(mover.releaseSeed());
 	}
 }
@@ -285,7 +287,7 @@ void ofApp::sendLatooInit() {
 
 void ofApp::sendLatooRate() {
 	ofxOscMessage msg = ofxOscMessage("/rate/latoo");
-	msg.addIntArg(rate);
+	msg.addIntArg(lat_rate);
 	sender.send(msg, false);
 }
 
@@ -293,11 +295,30 @@ void ofApp::sendLatooAmpState(bool isOn) {
 	ofxOscMessage msg = ofxOscMessage("/latoo/mul");
 	msg.addIntArg(isOn);
 	sender.send(msg, false);
-
-
 }
 
 void ofApp::sendShutdown() {
 	ofxOscMessage msg = ofxOscMessage("/shutdown");
 	sender.send(msg, false);
+}
+
+void ofApp::oscReceive() {
+	while (receiver.hasWaitingMessages()) {
+		ofxOscMessage msg;
+		receiver.getNextMessage(msg);
+
+		// ofLog() << "Received OSC: " << msg.getAddress();
+
+		if (msg.getAddress() == "/amp") {
+			ampFromSC = msg.getArgAsFloat(0);
+			updateGridFromAmp();
+			// ofLog() << "Received amp value: " << amp;
+		}
+
+		// 다른 주소도 이와 같이 추가 가능
+	}
+}
+
+void ofApp::exit() {
+	sendShutdown();
 }

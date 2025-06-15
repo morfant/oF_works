@@ -10,6 +10,11 @@
 
 #define HOST "127.0.0.1"
 #define PORT_OUT 57120
+#define PORT_IN 12000
+
+#define SEED_SIT_THR 5
+#define ATTR_ITER_NUM 10000
+#define ATTR_RAD 2
 
 class ofApp : public ofBaseApp {
 public:
@@ -19,6 +24,8 @@ public:
 
 	void updateParameters();
 	void applyBlackholeForce();
+	void renderAttractor();
+	void updateGridFromAmp();
 
 	// ofApp.h
 	void onInitXChanged(float & val);
@@ -31,6 +38,7 @@ public:
 	void sendLatooRate();
 	void sendLatooAmpState(bool isOn);
 	void sendShutdown();
+	void oscReceive();
 
 
     void keyPressed(int key);
@@ -38,6 +46,8 @@ public:
     void mouseDragged(int x, int y, int button);
     void mouseReleased(int x, int y, int button);
 	// void onSliderChanged(int& value);
+
+	void exit();
 
 
     bool ampLatoo, useLines;
@@ -53,9 +63,7 @@ public:
 
     ofFbo attractorLayer;
     float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
-    float ampFromSC;
-	float init_x, init_y;
-	int rate;
+	int lat_rate;
 
 	ofxPanel gui;
 	ofxFloatSlider fSlider[2];    // Float 타입 슬라이더
@@ -63,5 +71,6 @@ public:
 	ofxToggle toggle;
 
 	ofxOscSender sender;
+	ofxOscReceiver receiver;
 
 };

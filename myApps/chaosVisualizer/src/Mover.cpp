@@ -51,7 +51,6 @@ bool Mover::isCollidingWith(const Blackhole& b) const {
 }
 
 Seed Mover::releaseSeed() const {
-    ofLog() << "release a seed!";
     return Seed(pos.x, pos.y);
 }
 
@@ -66,8 +65,8 @@ void Mover::update() {
 void Mover::draw() {
 	ofFill();
     ofSetColor(90, 134, 124, 150);
-    ofDrawCircle(pos, diameter);
+    ofDrawCircle(pos, diameter * 0.5);
 
     ofSetColor(90, 84, 84, 250);
-    ofDrawCircle(pos, diameter * 0.5);
+    ofDrawCircle(pos, diameter * 0.25);
 }

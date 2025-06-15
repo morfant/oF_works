@@ -21,7 +21,9 @@ public:
     void checkEdges();
     bool isCollidingWith(const Blackhole& b);
     bool revealGridCell(Grid& grid, float threshold);
-    void update();
+	void update();
+	bool update(const std::vector<Blackhole> &blackholes, Grid &grid, float sitThreshold);
+
     void display();
     bool isOffscreen();
     void destroy();
