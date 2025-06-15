@@ -14,7 +14,7 @@
 
 #define SEED_SIT_THR 5
 #define ATTR_ITER_NUM 10000
-#define ATTR_RAD 2
+#define ATTR_RAD 1
 
 class ofApp : public ofBaseApp {
 public:
@@ -38,6 +38,8 @@ public:
 	void sendLatooRate();
 	void sendLatooAmpState(bool isOn);
 	void sendShutdown();
+	void sendSeedPositions();
+	void removeSeedAt(int index);
 	void oscReceive();
 
 
@@ -54,6 +56,8 @@ public:
 	bool isDragging, overToggle, overSlider;
 	Blackhole* draggingBlackhole = nullptr;
 
+    float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
+	int lat_rate;
 
     Mover mover;
     vector<Seed> seeds;
@@ -62,14 +66,14 @@ public:
     ofImage hiddenImg;
 
     ofFbo attractorLayer;
-    float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
-	int lat_rate;
 
+	// UI
 	ofxPanel gui;
 	ofxFloatSlider fSlider[2];    // Float 타입 슬라이더
 	ofxIntSlider iSlider;    // Int 타입 슬라이더
 	ofxToggle toggle;
 
+	// OSC
 	ofxOscSender sender;
 	ofxOscReceiver receiver;
 

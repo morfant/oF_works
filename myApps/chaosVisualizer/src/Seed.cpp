@@ -1,7 +1,11 @@
 // Seed.cpp
 #include "Seed.h"
 
+
+int Seed::nextID = 0;
+
 Seed::Seed(float x, float y) {
+	id = nextID++;
 	pos.set(x, y);
 	vel.set(0, 0);
 	acc.set(0, 0);
@@ -83,9 +87,14 @@ bool Seed::update(const std::vector<Blackhole> & blackholes, Grid & grid, float 
 	// 움직임 업데이트
 	this->update(); // 내부 pos/vel 갱신용
 
-	if (revealGridCell(grid, sitThreshold)) return true;
+	if (isOffscreen() || revealGridCell(grid, sitThreshold)) {
+		done = true;
+		return true;
+	}
 
-	if (isOffscreen()) return true;
+	// if (revealGridCell(grid, sitThreshold)) return true;
+
+	// if (isOffscreen()) return true;
 
 	return false;
 }
@@ -97,6 +106,10 @@ void Seed::display() {
 
 bool Seed::isOffscreen() {
 	return pos.x < -radius || pos.x > width + radius || pos.y < -radius || pos.y > height + radius;
+}
+
+bool Seed::isDone() const {
+	return done;
 }
 
 void Seed::destroy() {

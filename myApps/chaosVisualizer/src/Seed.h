@@ -6,6 +6,10 @@
 
 class Seed {
 public:
+	static int nextID; // 전역 ID 증가용
+    int id;
+	bool done = false;
+
 	static constexpr float VEL_LIMIT = 15.0f;
     ofVec2f pos, vel, acc;
     float radius;
@@ -26,5 +30,6 @@ public:
 
     void display();
     bool isOffscreen();
+	bool isDone() const;
     void destroy();
 };

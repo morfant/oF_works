@@ -62,11 +62,13 @@ void ofApp::update() {
 
 	for (int i = seeds.size() - 1; i >= 0; --i) {
 		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
-			seeds.erase(seeds.begin() + i);
+			removeSeedAt(i);
+			// seeds.erase(seeds.begin() + i);
 		}
 	}
 
 	// OSC
+	sendSeedPositions();
 	oscReceive();
 }
 
@@ -95,6 +97,7 @@ void ofApp::draw() {
 	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 260);
 	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
 	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
+	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
 }
 
 void ofApp::updateParameters() {
@@ -151,7 +154,8 @@ void ofApp::renderAttractor() {
 		if (useLines) {
 			if (!isFirst) ofDrawLine(prevX, prevY, px, py);
 		} else {
-			ofDrawCircle(px, py, ATTR_RAD + (ampFromSC * 10));
+			// ofDrawCircle(px, py, ATTR_RAD + (ampFromSC * 10));
+			ofDrawCircle(px, py, ATTR_RAD);
 		}
 
 		isFirst = false;
@@ -167,7 +171,7 @@ void ofApp::renderAttractor() {
 }
 
 void ofApp::updateGridFromAmp() {
-	float normAmp = ofClamp(ampFromSC, 0.0f, 1.0f); // 0~1 범위로 정규화
+	// float normAmp = ofClamp(ampFromSC, 0.0f, 1.0f); // 0~1 범위로 정규화
 
 	// 예: mover 위치 기준으로 셀에 값을 매핑
 	// grid.setValueAt(mover.pos.x, mover.pos.y, normAmp);
@@ -300,6 +304,29 @@ void ofApp::sendLatooAmpState(bool isOn) {
 void ofApp::sendShutdown() {
 	ofxOscMessage msg = ofxOscMessage("/shutdown");
 	sender.send(msg, false);
+}
+
+void ofApp::sendSeedPositions() {
+	for (auto & seed : seeds) {
+		ofxOscMessage msg;
+		msg.setAddress("/seed/pos");
+		msg.addIntArg(seed.id);
+		msg.addFloatArg(seed.pos.x);
+		msg.addFloatArg(seed.pos.y);
+		sender.sendMessage(msg, false);
+	}
+}
+
+void ofApp::removeSeedAt(int index) {
+	int id = seeds[index].id;
+
+	// OSC 메시지 전송
+	ofxOscMessage msg;
+	msg.setAddress("/seed/remove");
+	msg.addIntArg(id);
+	sender.sendMessage(msg, false); // sender는 ofxOscSender 객체
+
+	seeds.erase(seeds.begin() + index);
 }
 
 void ofApp::oscReceive() {
