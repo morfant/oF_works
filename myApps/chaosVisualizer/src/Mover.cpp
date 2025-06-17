@@ -62,11 +62,21 @@ void Mover::update() {
     checkEdges(true);
 }
 
-void Mover::draw() {
+void Mover::draw(bool dot) {
 	ofFill();
-    ofSetColor(90, 134, 124, 150);
-    ofDrawCircle(pos, diameter * 0.5);
 
-    ofSetColor(90, 84, 84, 250);
-    ofDrawCircle(pos, diameter * 0.25);
+    if (!dot)
+    {
+        ofSetColor(90, 134, 124, 150);
+        ofDrawCircle(pos, diameter * 0.5);
+
+        ofSetColor(90, 84, 84, 250);
+        ofDrawCircle(pos, diameter * 0.25);
+    }
+    else 
+    {
+        ofSetColor(255, 200, 10);
+        ofDrawCircle(pos, diameter * 0.05);
+    }
+    
 }

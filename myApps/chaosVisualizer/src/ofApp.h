@@ -32,6 +32,7 @@ public:
 	void onInitYChanged(float & val);
 	void onRateChanged(int & val);
 	void onToggleChanged(bool & val);
+	void onToggleDrawThings(bool & val);
 
 	void sendLatooParams();
 	void sendLatooInit();
@@ -52,7 +53,7 @@ public:
 	void exit();
 
 
-    bool ampLatoo, useLines;
+    bool drawThings, ampLatoo, useLines;
 	bool isDragging, overToggle, overSlider;
 	Blackhole* draggingBlackhole = nullptr;
 
@@ -72,6 +73,7 @@ public:
 	ofxFloatSlider fSlider[2];    // Float 타입 슬라이더
 	ofxIntSlider iSlider;    // Int 타입 슬라이더
 	ofxToggle toggle;
+	ofxToggle toggleDraw;
 
 	// OSC
 	ofxOscSender sender;

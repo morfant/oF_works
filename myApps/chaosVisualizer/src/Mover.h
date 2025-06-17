@@ -21,5 +21,5 @@ public:
     bool isCollidingWith(const Blackhole& b) const;
     Seed releaseSeed() const;
     void update();
-    void draw();
+    void draw(bool dot);
 };

@@ -21,6 +21,7 @@ void ofApp::setup() {
 	lat_rate = 100;
 	ampLatoo = false;
 	useLines = false;
+	drawThings = true;
 
 	attractorLayer.allocate(width, height, GL_RGBA);
 
@@ -48,6 +49,10 @@ void ofApp::setup() {
 
 	gui.add(toggle.setup("Amp On", ampLatoo));
 	toggle.addListener(this, &ofApp::onToggleChanged);
+
+	gui.add(toggleDraw.setup("Draw things", drawThings));
+	toggleDraw.addListener(this, &ofApp::onToggleDrawThings);
+
 
 	// Init values
 	sendLatooInit();
@@ -78,11 +83,15 @@ void ofApp::draw() {
 
 	grid.display();
 
-	mover.draw();
+	mover.draw(true);
 	for (auto & s : seeds)
 		s.display();
-	for (auto & b : blackholes)
-		b.display();
+
+	if (drawThings)
+	{
+		for (auto & b : blackholes)
+			b.display();
+	}
 
 	renderAttractor();
 
@@ -121,7 +130,7 @@ void ofApp::applyBlackholeForce() {
 			minDist = d;
 			nearest = &b;
 		}
-		b.display(); // 만약 display()가 const 함수면, b를 const 참조로 받아야 함
+		// b.display(); // 만약 display()가 const 함수면, b를 const 참조로 받아야 함
 	}
 
 	if (nearest != nullptr) {
@@ -214,6 +223,11 @@ void ofApp::onToggleChanged(bool & val) {
 		sendLatooInit();
 		sendLatooRate();
 	}
+}
+
+void ofApp::onToggleDrawThings(bool & val) {
+	drawThings = val;
+	ofLog() << drawThings;
 }
 
 //--------------------------------------------------------------
