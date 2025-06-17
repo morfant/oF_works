@@ -274,7 +274,8 @@ void ofApp::mouseReleased(int x, int y, int button) {
 }
 
 void ofApp::sendLatooParams() {
-	ofxOscMessage msg = ofxOscMessage("/latoo");
+	ofxOscMessage msg;
+	msg.setAddress("/latoo");
 	msg.addFloatArg(lat_a);
 	msg.addFloatArg(lat_b);
 	msg.addFloatArg(lat_c);
@@ -283,27 +284,31 @@ void ofApp::sendLatooParams() {
 }
 
 void ofApp::sendLatooInit() {
-	ofxOscMessage msg = ofxOscMessage("/init/latoo");
+	ofxOscMessage msg;
+	msg.setAddress("/init/latoo");
 	msg.addFloatArg(lat_x);
 	msg.addFloatArg(lat_y);
-	sender.send(msg, false);
+	sender.sendMessage(msg, false);
 }
 
 void ofApp::sendLatooRate() {
-	ofxOscMessage msg = ofxOscMessage("/rate/latoo");
+	ofxOscMessage msg; 
+	msg.setAddress("/rate/latoo");
 	msg.addIntArg(lat_rate);
-	sender.send(msg, false);
+	sender.sendMessage(msg, false);
 }
 
 void ofApp::sendLatooAmpState(bool isOn) {
-	ofxOscMessage msg = ofxOscMessage("/latoo/mul");
+	ofxOscMessage msg;
+	msg.setAddress("/latoo/mul");
 	msg.addIntArg(isOn);
-	sender.send(msg, false);
+	sender.sendMessage(msg, false);
 }
 
 void ofApp::sendShutdown() {
-	ofxOscMessage msg = ofxOscMessage("/shutdown");
-	sender.send(msg, false);
+	ofxOscMessage msg;
+	msg.setAddress("/shutdown");
+	sender.sendMessage(msg, false);
 }
 
 void ofApp::sendSeedPositions() {
