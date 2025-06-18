@@ -1,15 +1,18 @@
 ~voice = Buffer.readChannel(s, ~path1, channels: [0, 0]);
 ~voice = Buffer.readChannel(s, "sample.ogg".resolveRelative, channels: [0, 0]);
-~ambi = Buffer.read(s, "2015_jiyeon_spacelike.wav".resolveRelative);
+~ambi = Buffer.read(s, "2015_jiyeon_spacelike.wav".resolveRelative, action: {"Buffer load done!".postln});
 
-~voice.plot
+~voice.play
 ~voice.query
 
+~ambi.play
+
+a =Synth(\latooConv, [\buf, ~ambi])
 
 (
 // Synthdef
-SynthDef(\latoo, {
-    arg mul = 0.0, abcd = #[1.572, 1.372, 1.429, 1.229],
+SynthDef(\latooConv, {
+    arg buf = ~ambi, mul = 0.0, abcd = #[1.572, 1.372, 1.429, 1.229],
     xi = 0.1, yi = 0.1, rate = s.sampleRate/2,
     amp = 0.5, isConv = 1;
 
@@ -18,7 +21,37 @@ SynthDef(\latoo, {
     sig = LeakDC.ar(sig);
     sig = RLPF.ar(sig, [100, 120]*2, 0.3);
 
-    radio = PlayBuf.ar(~voice.numChannels, ~voice.bufnum, BufRateScale.kr(~voice) * 0.9, loop: 1);
+    radio = PlayBuf.ar(2, buf, BufRateScale.kr(buf) * 0.9, startPos: s.sampleRate * 2.0, loop: 1);
+
+    sig = Convolution.ar(radio, sig, 1024);
+
+    // SendReply.ar(Impulse.ar(32), '/processing/peak', PeakFollower.ar(sig));
+
+    // sig = if(isConv, radio * 0.1, sig);
+
+
+    sig = FreeVerb2.ar(sig[0], sig[1], 0.5);
+
+
+
+    Out.ar(0, sig * amp * mul!2);
+
+}).add;
+
+
+
+
+SynthDef(\latoo, {
+    arg buf = ~ambi, mul = 0.0, abcd = #[1.572, 1.372, 1.429, 1.229],
+    xi = 0.1, yi = 0.1, rate = s.sampleRate/2,
+    amp = 0.5, isConv = 1;
+
+    var sig, radio, pk;
+    sig = LatoocarfianN.ar(rate, abcd[0], abcd[1], abcd[2], abcd[3], xi, yi, mul: 0.1);
+    sig = LeakDC.ar(sig);
+    sig = RLPF.ar(sig, [100, 120]*2, 0.3);
+
+    radio = PlayBuf.ar(buf.numChannels, buf, BufRateScale.kr(buf) * 0.9, loop: 1);
 
 
     SendReply.ar(Impulse.ar(32), '/processing/peak', PeakFollower.ar(sig));
@@ -130,7 +163,7 @@ OSCdef(\latooMul, { |msg|
         };
 
     }, {
-        ~syn_latoo = Synth(\latoo);
+                ~syn_latoo = Synth(\latooConv, [\buf, ~ambi]);
         ~syn_latoo.set(\mul, 0.5);
     });
 }, '/latoo/mul');
@@ -150,7 +183,7 @@ OSCdef(\seedPosWithID, { |msg|
 
     if (~seedSynths[id].notNil) {
         // 기존 Synth가 있다면 업데이트
-        ~seedSynths[id].set(\speed, xx, \bufnum, ~voice.bufnum);
+        ~seedSynths[id].set(\speed, xx, \bufnum, ~voice);
 
     } {
         // 없으면 새로 생성
