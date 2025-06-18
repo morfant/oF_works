@@ -65,9 +65,10 @@ void ofApp::update() {
 	updateParameters();
 	applyBlackholeForce();
 
+	// Seed remove
 	for (int i = seeds.size() - 1; i >= 0; --i) {
 		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
-			removeSeedAt(i);
+			// removeSeedAt(i);
 			// seeds.erase(seeds.begin() + i);
 		}
 	}
@@ -116,7 +117,7 @@ void ofApp::updateParameters() {
 	lat_d = ofMap(mover.pos.y, 0, height, 0.5, 1.5);
 
 	if (ampLatoo) {
-		sendLatooParams();
+		// sendLatooParams();
 	};
 }
 
@@ -306,7 +307,7 @@ void ofApp::sendLatooInit() {
 }
 
 void ofApp::sendLatooRate() {
-	ofxOscMessage msg; 
+	ofxOscMessage msg;
 	msg.setAddress("/rate/latoo");
 	msg.addIntArg(lat_rate);
 	sender.sendMessage(msg, false);

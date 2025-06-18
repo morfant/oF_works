@@ -47,6 +47,25 @@ SynthDef(\seedSound, {
 }).add;
 
 
+SynthDef(\bufReader, {
+    |out=0, rate=1.0, amp=0.2, x = 0, y = 0|
+
+    var sig, pos, bufFrames;
+
+    // 현재 버퍼 프레임 수 구함
+    bufFrames = BufFrames.kr(~voice);
+
+    pos = ((x * 120) + (y * 80)/(120 * 80)) * bufFrames;
+
+    // BufRd: 버퍼에서 위치 기반으로 읽기 (linear interpolation)
+	sig = BufRd.ar(1, ~voice, K2A.ar(pos), loop: 0);
+
+    // 출력
+    Out.ar(out, sig * amp ! 2);
+}).add;
+
+
+
 // OSC
 /* RECEIVE */
 
@@ -91,8 +110,8 @@ OSCdef(\latooMul, { |msg|
 		};
 
 	}, {
-		~syn_latoo = Synth(\latoo);
-		~syn_latoo.set(\mul, 1.0);
+		// ~syn_latoo = Synth(\latoo);
+		// ~syn_latoo.set(\mul, 1.0);
 	});
 }, '/latoo/mul');
 
@@ -102,18 +121,19 @@ OSCdef(\latooMul, { |msg|
 
 OSCdef(\seedPosWithID, { |msg|
 	var id = msg[1].asInteger;
-	var x = msg[2].asFloat;
-	var y = msg[3].asFloat;
-	[id, x, y].postln;
+	var x = msg[2].asInteger;
+	var y = msg[3].asInteger;
+	// [id, x, y].postln;
 
 	if (~seedSynths[id].notNil) {
 		// 기존 Synth가 있다면 업데이트
 		~seedSynths[id].set(\x, x, \y, y);
 	} {
 		// 없으면 새로 생성
-		~seedSynths[id] = Synth(\seedSound, [
+		// ~seedSynths[id] = Synth(\seedSound, [
+		~seedSynths[id] = Synth(\bufReader2, [
 			\x, x, \y, y,
-			\amp, 0.05
+			\amp, 0.5
 		]);
 	};
 }, "/seed/pos");
