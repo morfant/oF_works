@@ -1,0 +1,176 @@
+~voice = Buffer.readChannel(s, "sample.ogg".resolveRelative, channels: [0, 0]);
+
+~voice.plot
+~voice.query
+
+
+(
+// Synthdef
+SynthDef(\latoo, {
+	arg mul = 0.0, abcd = #[1.572, 1.372, 1.429, 1.229],
+	xi = 0.1, yi = 0.1, rate = s.sampleRate/2,
+	amp = 0.5, isConv = 1;
+
+	var sig, radio, pk;
+	sig = LatoocarfianN.ar(rate, abcd[0], abcd[1], abcd[2], abcd[3], xi, yi, mul: 0.1);
+	sig = LeakDC.ar(sig);
+	sig = RLPF.ar(sig, [100, 120]*2, 0.3);
+
+	radio = PlayBuf.ar(~voice.numChannels, ~voice.bufnum, BufRateScale.kr(~voice) * 0.9, loop: 1);
+
+
+	SendReply.ar(Impulse.ar(32), '/processing/peak', PeakFollower.ar(sig));
+
+	sig = if(isConv, radio * 0.1, sig);
+
+
+	sig = FreeVerb2.ar(sig[0], sig[1], 0.5);
+
+
+
+	Out.ar(0, sig * amp * mul!2);
+
+}).add;
+
+
+SynthDef(\seedSound, {
+	|freq = 440, amp = 0.2, x = 0.5, y = 0.5|
+
+	var sig;
+
+	// x와 y 값을 기반으로 주파수를 조절 (예시)
+	var dynamicFreq = freq * ((x * 120) + (y * 80)/(120 * 80));  // x, y 좌표 반영
+
+	sig = SinOsc.ar(dynamicFreq) * amp;
+
+	Out.ar(0, sig.dup);
+}).add;
+
+
+// OSC
+/* RECEIVE */
+
+// Rate
+OSCdef(\latooRate, { |msg|
+	var r;
+	r = msg[1];
+	["Latoocarfian Rate: r=", r].postln;
+	~syn_latoo.set(\rate, r);
+}, '/rate/latoo');
+
+// 초기값 수신
+OSCdef(\latooInit, { |msg|
+	var x, y;
+	#x, y = msg[1..2];
+	["Latoocarfian Init: x=", x, "y=", y].postln;
+	~syn_latoo.set(\xi, x, \yi, y);
+}, '/init/latoo');
+
+// a, b, c, d 파라미터 수신
+OSCdef(\latooParams, { |msg|
+	var a, b, c, d;
+	#a, b, c, d = msg[1..4].round(0.001);
+	// [a, b, c, d].postln;
+	~syn_latoo.set(\abcd, [a, b, c, d]);
+}, '/latoo');
+
+// mul 제어
+OSCdef(\latooMul, { |msg|
+	var mul;
+	mul = msg[1];
+	if (mul == 0, {
+		~syn_latoo.free;
+
+		// 모든 Seed Synth 제거
+		if (~seedSynths.notNil) {
+			~seedSynths.do { |synth, id|
+				("Freeing seed synth ID: " ++ id).postln;
+				synth.free;
+			};
+			~seedSynths.clear;
+		};
+
+	}, {
+		~syn_latoo = Synth(\latoo);
+		~syn_latoo.set(\mul, 1.0);
+	});
+}, '/latoo/mul');
+
+
+// seed 별로 Synth를 개별 생성 및 관리
+~seedSynths = IdentityDictionary.new;
+
+OSCdef(\seedPosWithID, { |msg|
+	var id = msg[1].asInteger;
+	var x = msg[2].asFloat;
+	var y = msg[3].asFloat;
+	[id, x, y].postln;
+
+	if (~seedSynths[id].notNil) {
+		// 기존 Synth가 있다면 업데이트
+		~seedSynths[id].set(\x, x, \y, y);
+	} {
+		// 없으면 새로 생성
+		~seedSynths[id] = Synth(\seedSound, [
+			\x, x, \y, y,
+			\amp, 0.05
+		]);
+	};
+}, "/seed/pos");
+
+OSCdef(\removeSeed, { |msg|
+	var id = msg[1];
+	("Removing Synth for Seed ID: " ++ id).postln;
+	~seedSynths[id].free;
+	~seedSynths.removeAt(id);
+}, "/seed/remove");
+
+
+OSCdef(\shutdown, { |msg|
+	"Received shutdown: %\n".postf(msg);
+
+	// 모든 Seed Synth 제거
+	if (~seedSynths.notNil) {
+		~seedSynths.do { |synth, id|
+			("Freeing seed synth ID: " ++ id).postln;
+			synth.free;
+		};
+		~seedSynths.clear;
+	};
+
+
+	~syn_latoo.free;
+}, '/shutdown');
+
+
+
+/* SEND */
+~pr = NetAddr("localhost", 12000);
+
+// amp를 Pr로 보내기
+OSCdef(\sendPeak, { |msg|
+	var amp, n = 5;
+	amp = (msg[3] + msg[4]) * 0.5;
+	// amp = n * amp.round(0.001).postln;
+
+	// amp.postln;
+	if (amp < 0.01, {
+		~syn_latoo.set(\isConv, 1);
+		// "isConv is 1".postln;
+
+	},{
+		~syn_latoo.set(\isConv, 0);
+		// "isConv is 0".postln;
+
+	});
+	// OSC로 amp를 송신
+	~pr.sendMsg("/amp", amp);
+
+}, '/processing/peak');
+
+
+)
+
+
+
+
