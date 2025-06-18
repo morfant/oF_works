@@ -68,7 +68,7 @@ void ofApp::update() {
 	// Seed remove
 	for (int i = seeds.size() - 1; i >= 0; --i) {
 		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
-			removeSeedAt(i);
+			// removeSeedAt(i);
 			// seeds.erase(seeds.begin() + i);
 		}
 	}
@@ -83,7 +83,7 @@ void ofApp::update() {
 void ofApp::draw() {
 	hiddenImg.draw(0, 0); // 이미지 그리기
 
-	grid.display();
+	grid.display(0);
 
 	mover.draw(true);
 	for (auto & s : seeds)

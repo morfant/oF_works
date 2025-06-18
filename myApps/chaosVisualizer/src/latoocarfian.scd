@@ -1,8 +1,10 @@
 ~voice = Buffer.readChannel(s, ~path1, channels: [0, 0]);
 ~voice = Buffer.readChannel(s, "sample.ogg".resolveRelative, channels: [0, 0]);
+~ambi = Buffer.read(s, "2015_jiyeon_spacelike.wav".resolveRelative);
 
 ~voice.plot
 ~voice.query
+
 
 (
 // Synthdef
