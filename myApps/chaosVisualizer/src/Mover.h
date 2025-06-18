@@ -6,7 +6,7 @@
 
 class Mover {
 public:
-	static constexpr float VEL_LIMIT = 10.0f;
+	static constexpr float VEL_LIMIT = 5.0f;
     ofVec2f pos, vel, acc;
     float diameter;
     float mass;

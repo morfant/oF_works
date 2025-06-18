@@ -40,6 +40,7 @@ public:
 	void sendLatooAmpState(bool isOn);
 	void sendShutdown();
 	void sendSeedPositions();
+	void sendSeedVelocity();
 	void removeSeedAt(int index);
 	void oscReceive();
 

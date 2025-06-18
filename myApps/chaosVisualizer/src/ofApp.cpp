@@ -68,13 +68,14 @@ void ofApp::update() {
 	// Seed remove
 	for (int i = seeds.size() - 1; i >= 0; --i) {
 		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
-			// removeSeedAt(i);
+			removeSeedAt(i);
 			// seeds.erase(seeds.begin() + i);
 		}
 	}
 
 	// OSC
-	sendSeedPositions();
+	// sendSeedPositions();
+	sendSeedVelocity();
 	oscReceive();
 }
 
@@ -117,7 +118,7 @@ void ofApp::updateParameters() {
 	lat_d = ofMap(mover.pos.y, 0, height, 0.5, 1.5);
 
 	if (ampLatoo) {
-		// sendLatooParams();
+		sendLatooParams();
 	};
 }
 
@@ -333,6 +334,17 @@ void ofApp::sendSeedPositions() {
 		msg.addIntArg(seed.id);
 		msg.addFloatArg(seed.pos.x);
 		msg.addFloatArg(seed.pos.y);
+		sender.sendMessage(msg, false);
+	}
+}
+
+void ofApp::sendSeedVelocity() {
+	for (auto & seed : seeds) {
+		ofxOscMessage msg;
+		msg.setAddress("/seed/vel");
+		msg.addIntArg(seed.id);
+		msg.addFloatArg(seed.vel.x);
+		msg.addFloatArg(seed.vel.y);
 		sender.sendMessage(msg, false);
 	}
 }
