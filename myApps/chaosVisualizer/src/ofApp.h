@@ -7,6 +7,8 @@
 #include "Grid.h"
 #include "Blackhole.h"
 // #include "UIControls.h"
+#include "AttractorPoint.h"
+
 
 #define HOST "127.0.0.1"
 #define PORT_OUT 57120
@@ -79,5 +81,8 @@ public:
 	// OSC
 	ofxOscSender sender;
 	ofxOscReceiver receiver;
+
+	vector<AttractorPoint> attractorPoints;
+	ofFbo attractorFbo;
 
 };

@@ -25,6 +25,18 @@ void ofApp::setup() {
 
 	attractorLayer.allocate(width, height, GL_RGBA);
 
+	attractorFbo.allocate(ofGetWidth(), ofGetHeight(), GL_RGBA);
+	attractorFbo.begin();
+	ofClear(0, 0, 0, 0);
+	attractorFbo.end();
+
+	// 초기 AttractorPoint 생성 (예: 1000개)
+	for (int i = 0; i < 10000; ++i) {
+		float x = ofRandom(-1, 1);
+		float y = ofRandom(-1, 1);
+		attractorPoints.emplace_back(x, y, lat_a, lat_b, lat_c, lat_d);
+	}
+
 	hiddenImg.load("cloud_0301.jpg");
 	hiddenImg.resize(width, height);
 
@@ -63,6 +75,16 @@ void ofApp::setup() {
 void ofApp::update() {
 	mover.update();
 	updateParameters();
+
+	for (auto& pt : attractorPoints) {
+		pt.resetPos();
+	}
+
+	for (auto& pt : attractorPoints) {
+		pt.setParams(lat_a, lat_b, lat_c, lat_d);
+		pt.update();  // 내부 수식으로 연속 궤적 생성
+	}
+
 	applyBlackholeForce();
 
 	// Seed remove
@@ -81,9 +103,9 @@ void ofApp::update() {
 
 //--------------------------------------------------------------
 void ofApp::draw() {
-	hiddenImg.draw(0, 0); // 이미지 그리기
+	// hiddenImg.draw(0, 0); // 이미지 그리기
 
-	grid.display(0);
+	// grid.display(1);
 
 	mover.draw(true);
 	for (auto & s : seeds)
@@ -96,6 +118,19 @@ void ofApp::draw() {
 	}
 
 	renderAttractor();
+	
+	attractorFbo.begin();
+	ofClear(0, 0, 0, 0);
+
+	for (auto& pt : attractorPoints) {
+		pt.draw(useLines);
+	}
+
+	attractorFbo.end();
+	attractorFbo.draw(0, 0);
+
+	// ofLog() << attractorPoints.size();
+
 
 	// UI
 	gui.draw();
@@ -109,6 +144,8 @@ void ofApp::draw() {
 	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
 	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
 	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
+
+	// ofLog() << "draw is done!";
 }
 
 void ofApp::updateParameters() {
@@ -116,6 +153,7 @@ void ofApp::updateParameters() {
 	lat_b = ofMap(mover.pos.y, 0, height, 0.2, 3.0);
 	lat_c = ofMap(mover.pos.x, 0, width, 0.5, 1.5);
 	lat_d = ofMap(mover.pos.y, 0, height, 0.5, 1.5);
+
 
 	if (ampLatoo) {
 		sendLatooParams();
