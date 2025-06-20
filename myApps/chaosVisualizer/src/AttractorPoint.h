@@ -37,6 +37,15 @@ public:
     }
 
     void update() {
+		if (convergeAmount > 0)
+		{
+			goingToTarget = true;
+		}
+		else
+		{
+			goingToTarget = false;
+		}
+
         prevPos = pos;
 
         float nextX = sin(b * pos.y) + c * sin(b * pos.x);

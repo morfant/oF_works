@@ -32,6 +32,7 @@ public:
 	void assignTargetPositionsFromImage(
 		const ofImage& img, vector<AttractorPoint>& points,
 		float threshold = 200.f, int step = 4);
+	void drawTargetPositions(const vector<AttractorPoint>& points);
 
 	// ofApp.h
 	void drawUI();

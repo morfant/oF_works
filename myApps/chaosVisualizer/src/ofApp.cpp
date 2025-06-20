@@ -13,10 +13,6 @@ void ofApp::setup() {
 	height = ofGetHeight();
 
 
-	ofImage maskImg;
-	maskImg.load("cloud_0301.jpg");
-	assignTargetPositionsFromImage(maskImg, attractorPoints);
-
 
 	lat_x = 2.5;
 	lat_y = 0.5;
@@ -52,6 +48,12 @@ void ofApp::setup() {
         attractorPoints.emplace_back(initX, initY, a, b, c, d);
 
 	}
+
+	// get image data
+	ofImage maskImg;
+	maskImg.load("sample.png");
+	assignTargetPositionsFromImage(maskImg, attractorPoints, 10, 4);
+
 
 	hiddenImg.load("cloud_0301.jpg");
 	hiddenImg.resize(width, height);
@@ -155,6 +157,7 @@ void ofApp::draw() {
 	attractorFbo.draw(0, 0);
 
 
+	drawTargetPositions(attractorPoints);
 
 	drawUI();
 
@@ -268,7 +271,10 @@ void ofApp::assignTargetPositionsFromImage(const ofImage& img,
         }
     }
 
-    std::shuffle(targetPositions.begin(), targetPositions.end());
+	// 새로운 C++ 방식: std::shuffle + 랜덤 엔진
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(targetPositions.begin(), targetPositions.end(), g);
 
     for (int i = 0; i < points.size(); i++) {
         if (i < targetPositions.size()) {
@@ -277,6 +283,19 @@ void ofApp::assignTargetPositionsFromImage(const ofImage& img,
     }
 }
 
+void ofApp::drawTargetPositions(const std::vector<AttractorPoint>& points) {
+    ofPushMatrix();
+    ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2); // 중심 기준으로
+
+    ofSetColor(255, 0, 0, 100);  // 빨간색, 투명도 약간
+    for (const auto& pt : points) {
+        float x = ofMap(pt.targetPos.x, -1, 1, -ofGetWidth()/2, ofGetWidth()/2);
+        float y = ofMap(pt.targetPos.y, -1, 1, -ofGetHeight()/2, ofGetHeight()/2);
+        ofDrawCircle(x, y, 2); // 작고 연한 점
+    }
+
+    ofPopMatrix();
+}
 
 void ofApp::drawUI()
 {
