@@ -15,7 +15,7 @@
 #define PORT_IN 12000
 
 #define SEED_SIT_THR 5
-#define ATTR_ITER_NUM 5000
+#define ATTR_ITER_NUM 10000
 #define ATTR_RAD 1
 
 class ofApp : public ofBaseApp {
@@ -30,6 +30,7 @@ public:
 	void updateGridFromAmp();
 
 	// ofApp.h
+	void drawUI();
 	void onInitXChanged(float & val);
 	void onInitYChanged(float & val);
 	void onRateChanged(int & val);

@@ -31,10 +31,19 @@ void ofApp::setup() {
 	attractorFbo.end();
 
 	// 초기 AttractorPoint 생성 (예: 1000개)
-	for (int i = 0; i < 10000; ++i) {
-		float x = ofRandom(-1, 1);
-		float y = ofRandom(-1, 1);
-		attractorPoints.emplace_back(x, y, lat_a, lat_b, lat_c, lat_d);
+	for (int i = 0; i < ATTR_ITER_NUM; ++i) {
+
+		float initX = ofRandom(-1, 1);
+        float initY = ofRandom(-1, 1);
+
+        // 각각 조금씩 다른 계수로 다양성 부여
+        float a = lat_a + ofRandom(-0.1, 0.1);
+        float b = lat_b + ofRandom(-0.1, 0.1);
+        float c = lat_c + ofRandom(-0.1, 0.1);
+        float d = lat_d + ofRandom(-0.1, 0.1);
+
+        attractorPoints.emplace_back(initX, initY, a, b, c, d);
+
 	}
 
 	hiddenImg.load("cloud_0301.jpg");
@@ -76,13 +85,11 @@ void ofApp::update() {
 	mover.update();
 	updateParameters();
 
-	for (auto& pt : attractorPoints) {
-		pt.resetPos();
-	}
-
+	// update AttractorPoint objects
 	for (auto& pt : attractorPoints) {
 		pt.setParams(lat_a, lat_b, lat_c, lat_d);
-		pt.update();  // 내부 수식으로 연속 궤적 생성
+		pt.update();
+		pt.resetPos();
 	}
 
 	applyBlackholeForce();
@@ -118,35 +125,31 @@ void ofApp::draw() {
 	}
 
 	renderAttractor();
-	
+
+	// draw AttractorPoint objects
 	attractorFbo.begin();
 	ofClear(0, 0, 0, 0);
 
-	for (auto& pt : attractorPoints) {
-		pt.draw(useLines);
-	}
+	ofPushMatrix();
+    ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
+    ofSetColor(255);
+
+    for (auto& pt : attractorPoints) {
+        pt.draw(useLines);
+    }
+
+    ofPopMatrix();
 
 	attractorFbo.end();
 	attractorFbo.draw(0, 0);
 
-	// ofLog() << attractorPoints.size();
 
 
-	// UI
-	gui.draw();
-
-	// ---- Debug Info: lat params & FPS ----
-	ofSetColor(255);
-	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 200);
-	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 220);
-	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 240);
-	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 260);
-	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
-	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
-	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
+	drawUI();
 
 	// ofLog() << "draw is done!";
 }
+
 
 void ofApp::updateParameters() {
 	lat_a = ofMap(mover.pos.x, 0, width, 0.2, 3.0);
@@ -236,6 +239,23 @@ void ofApp::updateGridFromAmp() {
 
 	// (선택) Reveal 형태를 쓰고 싶다면 아래처럼:
 	grid.revealValue(mover.pos.x, mover.pos.y);
+}
+
+void ofApp::drawUI()
+{
+	// UI
+	gui.draw();
+
+	// ---- Debug Info: lat params & FPS ----
+	ofSetColor(255);
+	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 200);
+	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 220);
+	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 240);
+	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 260);
+	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
+	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
+	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
+
 }
 
 void ofApp::onInitXChanged(float & val) {
