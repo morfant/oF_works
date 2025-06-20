@@ -12,6 +12,12 @@ void ofApp::setup() {
 	width = ofGetWidth();
 	height = ofGetHeight();
 
+
+	ofImage maskImg;
+	maskImg.load("cloud_0301.jpg");
+	assignTargetPositionsFromImage(maskImg, attractorPoints);
+
+
 	lat_x = 2.5;
 	lat_y = 0.5;
 	lat_a = 1.0;
@@ -19,6 +25,7 @@ void ofApp::setup() {
 	lat_c = 0.5;
 	lat_d = 0.5;
 	lat_rate = 100;
+	convergeAmount = 0.f;
 	ampLatoo = false;
 	useLines = false;
 	drawThings = true;
@@ -64,9 +71,12 @@ void ofApp::setup() {
 	gui.add(fSlider[0].setup("INIT_X", lat_x, -5, 5));
 	gui.add(fSlider[1].setup("INIT_Y", lat_y, -5, 5));
 	gui.add(iSlider.setup("LAT_RATE", lat_rate, 10, 48000));
+	gui.add(fSlider[2].setup("CONVERGE", convergeAmount, 0.0, 1.0));
+
 	fSlider[0].addListener(this, &ofApp::onInitXChanged);
 	fSlider[1].addListener(this, &ofApp::onInitYChanged);
 	iSlider.addListener(this, &ofApp::onRateChanged);
+	fSlider[2].addListener(this, &ofApp::onConvergeChanged);
 
 	gui.add(toggle.setup("Amp On", ampLatoo));
 	toggle.addListener(this, &ofApp::onToggleChanged);
@@ -88,6 +98,7 @@ void ofApp::update() {
 	// update AttractorPoint objects
 	for (auto& pt : attractorPoints) {
 		pt.setParams(lat_a, lat_b, lat_c, lat_d);
+		pt.convergeAmount = convergeAmount;
 		pt.update();
 		pt.resetPos();
 	}
@@ -241,6 +252,32 @@ void ofApp::updateGridFromAmp() {
 	grid.revealValue(mover.pos.x, mover.pos.y);
 }
 
+void ofApp::assignTargetPositionsFromImage(const ofImage& img,
+	std::vector<AttractorPoint>& points,
+	float threshold, int step) {
+    vector<ofVec2f> targetPositions;
+
+    for (int y = 0; y < img.getHeight(); y += step) {
+        for (int x = 0; x < img.getWidth(); x += step) {
+            float brightness = img.getColor(x, y).getBrightness();
+            if (brightness > threshold) {
+                float normX = ofMap(x, 0, img.getWidth(), -1, 1);
+                float normY = ofMap(y, 0, img.getHeight(), -1, 1);
+                targetPositions.emplace_back(normX, normY);
+            }
+        }
+    }
+
+    std::shuffle(targetPositions.begin(), targetPositions.end());
+
+    for (int i = 0; i < points.size(); i++) {
+        if (i < targetPositions.size()) {
+            points[i].targetPos = targetPositions[i];
+        }
+    }
+}
+
+
 void ofApp::drawUI()
 {
 	// UI
@@ -271,6 +308,10 @@ void ofApp::onInitYChanged(float & val) {
 void ofApp::onRateChanged(int & val) {
 	lat_rate = val;
 	sendLatooRate();
+}
+
+void ofApp::onConvergeChanged(float & val) {
+	convergeAmount = val;
 }
 
 void ofApp::onToggleChanged(bool & val) {

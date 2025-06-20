@@ -6,8 +6,13 @@ public:
     float initX, initY;
     ofVec2f pos;
     ofVec2f prevPos;
+
+	ofVec2f targetPos;
+	float convergeAmount = 0.0f;  // 0.0 = pure chaos, 1.0 = full convergence
+
     float a, b, c, d;
     bool hasPrev = false;
+	bool goingToTarget = false;
 
     AttractorPoint(float initX_, float initY_, float _a, float _b, float _c, float _d) {
         initX = initX_;
@@ -36,8 +41,17 @@ public:
 
         float nextX = sin(b * pos.y) + c * sin(b * pos.x);
         float nextY = sin(a * pos.x) + d * sin(a * pos.y);
+		ofVec2f chaoticPos(nextX, nextY);
 
-        pos.set(nextX, nextY);
+		if (goingToTarget)
+		{
+			// 점차적으로 targetPos로 수렴
+			pos = chaoticPos * (1.0 - convergeAmount) + targetPos * convergeAmount;
+		}
+		else {
+			pos = chaoticPos;
+		}
+
         hasPrev = true;
     }
 

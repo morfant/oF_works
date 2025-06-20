@@ -24,16 +24,21 @@ public:
     void update();
     void draw();
 
+
 	void updateParameters();
 	void applyBlackholeForce();
 	void renderAttractor();
 	void updateGridFromAmp();
+	void assignTargetPositionsFromImage(
+		const ofImage& img, vector<AttractorPoint>& points,
+		float threshold = 200.f, int step = 4);
 
 	// ofApp.h
 	void drawUI();
 	void onInitXChanged(float & val);
 	void onInitYChanged(float & val);
 	void onRateChanged(int & val);
+	void onConvergeChanged(float & val);
 	void onToggleChanged(bool & val);
 	void onToggleDrawThings(bool & val);
 
@@ -62,6 +67,7 @@ public:
 	Blackhole* draggingBlackhole = nullptr;
 
     float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
+	float convergeAmount;
 	int lat_rate;
 
     Mover mover;
@@ -74,7 +80,7 @@ public:
 
 	// UI
 	ofxPanel gui;
-	ofxFloatSlider fSlider[2];    // Float 타입 슬라이더
+	ofxFloatSlider fSlider[3];    // Float 타입 슬라이더
 	ofxIntSlider iSlider;    // Int 타입 슬라이더
 	ofxToggle toggle;
 	ofxToggle toggleDraw;
