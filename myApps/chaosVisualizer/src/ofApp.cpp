@@ -12,8 +12,6 @@ void ofApp::setup() {
 	width = ofGetWidth();
 	height = ofGetHeight();
 
-
-
 	lat_x = 2.5;
 	lat_y = 0.5;
 	lat_a = 1.0;
@@ -50,9 +48,10 @@ void ofApp::setup() {
 	}
 
 	// get image data
+	// Do this after creating AttractorPoint objects
 	ofImage maskImg;
-	maskImg.load("sample.png");
-	assignTargetPositionsFromImage(maskImg, attractorPoints, 10, 4);
+	maskImg.load("sparrow.png");
+	assignTargetPositionsFromImage(maskImg, attractorPoints, 150, 4);
 
 
 	hiddenImg.load("cloud_0301.jpg");
@@ -157,7 +156,8 @@ void ofApp::draw() {
 	attractorFbo.draw(0, 0);
 
 
-	drawTargetPositions(attractorPoints);
+	// check for the data from the image
+	// drawTargetPositions(attractorPoints);
 
 	drawUI();
 
@@ -263,7 +263,7 @@ void ofApp::assignTargetPositionsFromImage(const ofImage& img,
     for (int y = 0; y < img.getHeight(); y += step) {
         for (int x = 0; x < img.getWidth(); x += step) {
             float brightness = img.getColor(x, y).getBrightness();
-            if (brightness > threshold) {
+            if (brightness < threshold) {
                 float normX = ofMap(x, 0, img.getWidth(), -1, 1);
                 float normY = ofMap(y, 0, img.getHeight(), -1, 1);
                 targetPositions.emplace_back(normX, normY);
