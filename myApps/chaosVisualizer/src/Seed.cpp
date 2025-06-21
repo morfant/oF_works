@@ -100,8 +100,17 @@ bool Seed::update(const std::vector<Blackhole> & blackholes, Grid & grid, float 
 }
 
 void Seed::display() {
-	ofSetColor(col);
-	ofDrawCircle(pos.x, pos.y, radius);
+	// dot
+	// ofSetColor(col);
+	// ofDrawCircle(pos.x, pos.y, radius);
+
+	// like a mover
+	int diameter = 40;
+	ofSetColor(90, 134, 124, 150);
+	ofDrawCircle(pos, diameter * 0.5);
+
+	ofSetColor(90, 84, 84, 250);
+	ofDrawCircle(pos, diameter * 0.25);
 }
 
 bool Seed::isOffscreen() {

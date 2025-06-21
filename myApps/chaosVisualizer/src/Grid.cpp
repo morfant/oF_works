@@ -35,9 +35,9 @@ void Grid::display(int mode) {
 				ofDrawCircle(
 					0.5 * cellW + i * cellW,
 					0.5 * cellH + j * cellH,
-					cellW * 0.5 + (ampFromSC * 10));
+					cellW * 0.5 + (ampFromSC * 20));
 			} else {
-				ofSetColor(100, v * 255, 100, v * 255);
+				ofSetColor(255, v * 255);
 				ofDrawRectangle(i * cellW, j * cellH, cellW, cellH);
 			}
 		}

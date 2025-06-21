@@ -54,12 +54,18 @@ Seed Mover::releaseSeed() const {
     return Seed(pos.x, pos.y);
 }
 
+void Mover::warp()
+{
+	pos.x = ofRandom(width);
+	pos.y = ofRandom(height);
+}
+
 void Mover::update() {
     vel += acc;
     vel.limit(Mover::VEL_LIMIT);
     pos += vel;
     acc.set(0, 0);
-    checkEdges(true);
+    checkEdges(false);
 }
 
 void Mover::draw(bool dot) {
@@ -73,10 +79,10 @@ void Mover::draw(bool dot) {
         ofSetColor(90, 84, 84, 250);
         ofDrawCircle(pos, diameter * 0.25);
     }
-    else 
+    else
     {
         ofSetColor(255, 200, 10);
         ofDrawCircle(pos, diameter * 0.05);
     }
-    
+
 }
