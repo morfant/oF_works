@@ -20,6 +20,7 @@ public:
     void checkEdges(bool blocked);
     bool isCollidingWith(const Blackhole& b) const;
     Seed releaseSeed() const;
+	void warp();
     void update();
     void draw(bool dot);
 };

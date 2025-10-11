@@ -19,6 +19,7 @@ void ofApp::setup() {
 	lat_c = 0.5;
 	lat_d = 0.5;
 	lat_rate = 100;
+	convergeAmount = 0.f;
 	ampLatoo = false;
 	useLines = false;
 	drawThings = true;
@@ -31,19 +32,37 @@ void ofApp::setup() {
 	attractorFbo.end();
 
 	// 초기 AttractorPoint 생성 (예: 1000개)
-	for (int i = 0; i < 10000; ++i) {
-		float x = ofRandom(-1, 1);
-		float y = ofRandom(-1, 1);
-		attractorPoints.emplace_back(x, y, lat_a, lat_b, lat_c, lat_d);
+	for (int i = 0; i < ATTR_ITER_NUM; ++i) {
+
+		float initX = ofRandom(-1, 1);
+        float initY = ofRandom(-1, 1);
+
+        // 각각 조금씩 다른 계수로 다양성 부여
+        float a = lat_a + ofRandom(-0.1, 0.1);
+        float b = lat_b + ofRandom(-0.1, 0.1);
+        float c = lat_c + ofRandom(-0.1, 0.1);
+        float d = lat_d + ofRandom(-0.1, 0.1);
+
+        attractorPoints.emplace_back(initX, initY, a, b, c, d);
+
 	}
 
-	hiddenImg.load("cloud_0301.jpg");
+	// get image data
+	// Do this after creating AttractorPoint objects
+	ofImage maskImg;
+	maskImg.load("dolphin.png");
+	assignTargetPositionsFromImage(maskImg, attractorPoints, 150, 4);
+
+
+	// hiddenImg.load("cloud_0301.jpg");
+	hiddenImg.load("dolphin.png");
 	hiddenImg.resize(width, height);
 
 	mover = Mover(ofGetWidth() / 2, ofGetHeight() / 2, 5);
 
+	grid = Grid(30, 20, width, height);
 	// grid = Grid(60, 40, width, height);
-	grid = Grid(120, 80, width, height);
+	// grid = Grid(120, 80, width, height);
 	grid.setFromImage(hiddenImg);
 	grid.reset();
 
@@ -55,9 +74,12 @@ void ofApp::setup() {
 	gui.add(fSlider[0].setup("INIT_X", lat_x, -5, 5));
 	gui.add(fSlider[1].setup("INIT_Y", lat_y, -5, 5));
 	gui.add(iSlider.setup("LAT_RATE", lat_rate, 10, 48000));
+	gui.add(fSlider[2].setup("CONVERGE", convergeAmount, 0.0, 1.0));
+
 	fSlider[0].addListener(this, &ofApp::onInitXChanged);
 	fSlider[1].addListener(this, &ofApp::onInitYChanged);
 	iSlider.addListener(this, &ofApp::onRateChanged);
+	fSlider[2].addListener(this, &ofApp::onConvergeChanged);
 
 	gui.add(toggle.setup("Amp On", ampLatoo));
 	toggle.addListener(this, &ofApp::onToggleChanged);
@@ -76,22 +98,30 @@ void ofApp::update() {
 	mover.update();
 	updateParameters();
 
+
+
+	// update AttractorPoint objects
 	for (auto& pt : attractorPoints) {
+		pt.setParams(lat_a, lat_b, lat_c, lat_d);
+		pt.convergeAmount = convergeAmount;
+		pt.update();
 		pt.resetPos();
 	}
 
-	for (auto& pt : attractorPoints) {
-		pt.setParams(lat_a, lat_b, lat_c, lat_d);
-		pt.update();  // 내부 수식으로 연속 궤적 생성
-	}
-
 	applyBlackholeForce();
+
+	for (auto & b : blackholes)
+	{
+		if (mover.isCollidingWith(b))
+		{
+			mover.warp();
+		}
+	}
 
 	// Seed remove
 	for (int i = seeds.size() - 1; i >= 0; --i) {
 		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
 			// removeSeedAt(i);
-			// seeds.erase(seeds.begin() + i);
 		}
 	}
 
@@ -105,9 +135,9 @@ void ofApp::update() {
 void ofApp::draw() {
 	// hiddenImg.draw(0, 0); // 이미지 그리기
 
-	// grid.display(1);
+	// grid.display(0);
 
-	mover.draw(true);
+	mover.draw(false);
 	for (auto & s : seeds)
 		s.display();
 
@@ -118,35 +148,33 @@ void ofApp::draw() {
 	}
 
 	renderAttractor();
-	
+
+	// draw AttractorPoint objects
 	attractorFbo.begin();
 	ofClear(0, 0, 0, 0);
 
-	for (auto& pt : attractorPoints) {
-		pt.draw(useLines);
-	}
+	ofPushMatrix();
+    ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
+    ofSetColor(255);
+
+    for (auto& pt : attractorPoints) {
+        pt.draw(useLines);
+    }
+
+    ofPopMatrix();
 
 	attractorFbo.end();
 	attractorFbo.draw(0, 0);
 
-	// ofLog() << attractorPoints.size();
 
+	// check for the data from the image
+	// drawTargetPositions(attractorPoints);
 
-	// UI
-	gui.draw();
-
-	// ---- Debug Info: lat params & FPS ----
-	ofSetColor(255);
-	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 200);
-	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 220);
-	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 240);
-	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 260);
-	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
-	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
-	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
+	drawUI();
 
 	// ofLog() << "draw is done!";
 }
+
 
 void ofApp::updateParameters() {
 	lat_a = ofMap(mover.pos.x, 0, width, 0.2, 3.0);
@@ -220,10 +248,10 @@ void ofApp::renderAttractor() {
 }
 
 void ofApp::updateGridFromAmp() {
-	// float normAmp = ofClamp(ampFromSC, 0.0f, 1.0f); // 0~1 범위로 정규화
+	float normAmp = ofClamp(ampFromSC, 0.0f, 1.0f); // 0~1 범위로 정규화
 
 	// 예: mover 위치 기준으로 셀에 값을 매핑
-	// grid.setValueAt(mover.pos.x, mover.pos.y, normAmp);
+	grid.setValueAt(mover.pos.x, mover.pos.y, normAmp * 10);
 
 	// 예: 주변 3x3 영역 셀에도 값 퍼뜨리기 (부드러운 반응)
 	// for (int dx = -1; dx <= 1; dx++) {
@@ -235,7 +263,66 @@ void ofApp::updateGridFromAmp() {
 	// }
 
 	// (선택) Reveal 형태를 쓰고 싶다면 아래처럼:
-	grid.revealValue(mover.pos.x, mover.pos.y);
+	// grid.revealValue(mover.pos.x, mover.pos.y);
+}
+
+void ofApp::assignTargetPositionsFromImage(const ofImage& img,
+	std::vector<AttractorPoint>& points,
+	float threshold, int step) {
+    vector<ofVec2f> targetPositions;
+
+    for (int y = 0; y < img.getHeight(); y += step) {
+        for (int x = 0; x < img.getWidth(); x += step) {
+            float brightness = img.getColor(x, y).getBrightness();
+            if (brightness < threshold) {
+                float normX = ofMap(x, 0, img.getWidth(), -1, 1);
+                float normY = ofMap(y, 0, img.getHeight(), -1, 1);
+                targetPositions.emplace_back(normX, normY);
+            }
+        }
+    }
+
+	// 새로운 C++ 방식: std::shuffle + 랜덤 엔진
+    std::random_device rd;
+    std::mt19937 g(rd());
+    std::shuffle(targetPositions.begin(), targetPositions.end(), g);
+
+    for (int i = 0; i < points.size(); i++) {
+        if (i < targetPositions.size()) {
+            points[i].targetPos = targetPositions[i];
+        }
+    }
+}
+
+void ofApp::drawTargetPositions(const std::vector<AttractorPoint>& points) {
+    ofPushMatrix();
+    ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2); // 중심 기준으로
+
+    ofSetColor(255, 0, 0, 100);  // 빨간색, 투명도 약간
+    for (const auto& pt : points) {
+        float x = ofMap(pt.targetPos.x, -1, 1, -ofGetWidth()/2, ofGetWidth()/2);
+        float y = ofMap(pt.targetPos.y, -1, 1, -ofGetHeight()/2, ofGetHeight()/2);
+        ofDrawCircle(x, y, 2); // 작고 연한 점
+    }
+
+    ofPopMatrix();
+}
+
+void ofApp::drawUI()
+{
+	// UI
+	gui.draw();
+
+	// ---- Debug Info: lat params & FPS ----
+	ofSetColor(255);
+	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 200);
+	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 220);
+	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 240);
+	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 260);
+	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
+	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
+	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
+
 }
 
 void ofApp::onInitXChanged(float & val) {
@@ -251,6 +338,10 @@ void ofApp::onInitYChanged(float & val) {
 void ofApp::onRateChanged(int & val) {
 	lat_rate = val;
 	sendLatooRate();
+}
+
+void ofApp::onConvergeChanged(float & val) {
+	convergeAmount = val;
 }
 
 void ofApp::onToggleChanged(bool & val) {
@@ -280,6 +371,27 @@ void ofApp::keyPressed(int key) {
 		// ofLog() << "Seed released!";
 		seeds.push_back(mover.releaseSeed());
 	}
+
+    if (key >= '1' && key <= '9') {
+        int number = key - '0'; // '1' → 1
+
+        // 이미 존재하는지 확인
+        auto it = std::find_if(blackholes.begin(), blackholes.end(),
+            [number](const Blackhole& b) {
+                return b.id == number;
+            });
+
+        if (it != blackholes.end()) {
+            ofLogNotice() << "Removing Blackhole #" << number;
+            blackholes.erase(it);
+        } else {
+            float bx = ofGetMouseX();
+            float by = ofGetMouseY();
+            ofLogNotice() << "Adding Blackhole #" << number;
+            blackholes.emplace_back(bx, by, number);
+        }
+    }
+
 }
 
 //--------------------------------------------------------------
