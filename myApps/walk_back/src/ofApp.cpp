@@ -5,8 +5,13 @@
 void ofApp::setup(){
 
 	ofSetFrameRate(60);
-	
 	realTime = false;
+
+	// Shader-driven background plane
+	// bgShader.load("../data/bg.vert", "../data/bg.frag");
+	// bgPlane.set(ofGetWidth(), ofGetHeight(), 2, 2);
+	// bgPlane.mapTexCoords(0.0f, 0.0f, 1.0f, 1.0f);
+	// bgPlane.setPosition(ofGetWidth() * 0.5f, ofGetHeight() * 0.5f, 0.0f);
 		
 	//MIDI SETTING
     midiIn.listInPorts();
@@ -24,7 +29,7 @@ void ofApp::setup(){
 
 	midiConReverse = false;
 	midiContAll = false;
-    
+
 }
 
 //--------------------------------------------------------------
@@ -49,6 +54,14 @@ void ofApp::update(){
 
 //--------------------------------------------------------------
 void ofApp::draw(){
+
+    // ofDisableDepthTest();
+    // bgShader.begin();
+    // bgShader.setUniform1f("uTime", ofGetElapsedTimef());
+    // bgShader.setUniform2f("uResolution", ofGetWidth(), ofGetHeight());
+    // bgPlane.draw();
+    // bgShader.end();
+    // ofEnableDepthTest();
 
 #ifdef DEBUG_MODE
     ofSetHexColor(0x005555);
@@ -350,7 +363,9 @@ void ofApp::mouseReleased(int x, int y, int button){
 
 //--------------------------------------------------------------
 void ofApp::windowResized(int w, int h){
-
+    bgPlane.set(w, h, 2, 2);
+    bgPlane.mapTexCoords(0.0f, 0.0f, 1.0f, 1.0f);
+    bgPlane.setPosition(w * 0.5f, h * 0.5f, 0.0f);
 }
 
 //--------------------------------------------------------------
