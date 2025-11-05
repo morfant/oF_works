@@ -12,18 +12,19 @@ void ofApp::setup(){
     
     side = gridX;
     
-    for (int i = 0; i < coordinate.size(); ++i) {
-        for (int j = 0; j < coordinate[i].size(); ++j) {
-            for (int k = 0; k < coordinate[i][j].size(); ++k) {
+    for (int i = 0; i < NUM_X; ++i) {
+        for (int j = 0; j < NUM_Y; ++j) {
+            for (int k = 0; k < NUM_Z; ++k) {
                     
                 cout << coordinate[i][j][k] << endl;
             }
         }
     }
     
-    for (int i = 0; i < coordinate.size(); ++i) {
-        for (int j = 0; j < coordinate[i].size(); ++j) {
-            for (int k = 0; k < coordinate[i][j].size(); ++k) {
+
+    for (int i = 0; i < NUM_X; ++i) {
+        for (int j = 0; j < NUM_Y; ++j) {
+            for (int k = 0; k < NUM_Z; ++k) {
                     
                 coordinate[i][j][k] = ofPoint(gridX * i, gridY * j, gridZ * k);
                 
@@ -45,11 +46,9 @@ void ofApp::draw(){
     cam.begin();
     ofBackground(0, 0, 0);
     
-    
-    for (int i = 0; i < coordinate.size(); ++i) {
-        for (int j = 0; j < coordinate[i].size(); ++j) {
-            for (int k = 0; k < coordinate[i][j].size(); ++k) {
-                
+    for (int i = 0; i < NUM_X; ++i) {
+        for (int j = 0; j < NUM_Y; ++j) {
+            for (int k = 0; k < NUM_Z; ++k) {
                 float d = 20.f;
                 
 //                float n = ofNoise(ofGetFrameNum()/120.f, ofGetFrameNum()/50.f, ofGetFrameNum()/340.f);

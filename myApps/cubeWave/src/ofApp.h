@@ -1,6 +1,7 @@
 #pragma once
 
 #include "ofMain.h"
+#include <array>
 
 #define NUM_X 20
 #define NUM_Y 20
@@ -24,7 +25,8 @@ class ofApp : public ofBaseApp{
 		void dragEvent(ofDragInfo dragInfo);
 		void gotMessage(ofMessage msg);
     
-        array<array<array<ofPoint, NUM_Z>, NUM_Y>, NUM_X> coordinate;
+        // array<array<array<ofPoint, NUM_Z>, NUM_Y>, NUM_X> coordinate;
+		ofPoint coordinate[NUM_X][NUM_Y][NUM_Z];
     
     float w, h;
     int gridX, gridY, gridZ;
