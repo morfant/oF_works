@@ -90,8 +90,8 @@ ofVec3f rgbToHsb(const ofColor& color) {
     float g = color.g / 255.0f;
     float b = color.b / 255.0f;
 
-    float maxVal = max(r, max(g, b));
-    float minVal = min(r, min(g, b));
+    float maxVal = std::max(r, std::max(g, b));
+    float minVal = std::min(r, std::min(g, b));
     float delta = maxVal - minVal;
 
     float hue = 0;
