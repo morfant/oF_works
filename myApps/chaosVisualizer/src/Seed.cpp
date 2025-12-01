@@ -24,12 +24,15 @@ void Seed::attract(const ofVec2f & target) {
 	ofVec2f force = target - pos;
 	float distance = ofClamp(force.length(), 5, 25);
 	force.normalize();
-	float strength = (G * mass) / (distance * distance);
+	// 질량에 따라 가속도가 달라지도록 mass를 strength에서 제거
+	float strength = G / (distance * distance);
 	force *= strength;
 	applyForce(force);
 }
 
 void Seed::checkEdges() {
+	bool heavy = (mass > 1.0f);
+
 	if (pos.x + radius >= width) {
 		pos.x = width - radius;
 		vel.x *= -1;
@@ -40,7 +43,12 @@ void Seed::checkEdges() {
 
 	if (pos.y + radius >= height) {
 		pos.y = height - radius;
-		vel.y *= -1;
+		if (heavy) {
+			// 무거운 시드는 바닥에서 멈춤
+			vel.y = 0;
+		} else {
+			vel.y *= -1;
+		}
 	} else if (pos.y - radius <= 0) {
 		pos.y = radius;
 		vel.y *= -1;
@@ -57,8 +65,17 @@ bool Seed::revealGridCell(Grid & grid, float threshold) {
 }
 
 void Seed::update() {
+	// 질량이 크면 아래로 향하는 "중력"을 추가
+	if (mass > 1.0f) {
+		float t = ofClamp(mass, 1.0f, 2.0f);
+		float g = ofMap(t, 1.0f, 2.0f, 0.1f, 1.5f, true);
+		acc.y += g;
+	}
+
 	vel += acc;
-	vel.limit(VEL_LIMIT);
+	// 질량에 따라 최대 속도도 달라지도록 조정 (0.01 ~ 2.0)
+	float maxVel = ofMap(mass, 0.01f, 2.0f, 30.0f, 3.0f, true);
+	vel.limit(maxVel);
 	pos += vel;
 	acc.set(0, 0);
 	checkEdges();
@@ -100,17 +117,19 @@ bool Seed::update(const std::vector<Blackhole> & blackholes, Grid & grid, float 
 }
 
 void Seed::display() {
-	// dot
-	// ofSetColor(col);
-	// ofDrawCircle(pos.x, pos.y, radius);
+	// 질량에 따라 색 농도(알파)와 크기를 더 극적으로 변화
+	float t = ofClamp(mass, 0.01f, 2.0f);
+	float tn = ofMap(t, 0.01f, 2.0f, 0.0f, 1.0f, true);
 
-	// like a mover
-	int diameter = 40;
-	ofSetColor(90, 134, 124, 150);
-	ofDrawCircle(pos, diameter * 0.5);
+	int alphaOuter = ofMap(tn, 0.0f, 1.0f, 40, 255, true);
+	int alphaInner = ofMap(tn, 0.0f, 1.0f, 80, 255, true);
+	float diameter = ofMap(tn, 0.0f, 1.0f, 20.0f, 90.0f, true);
 
-	ofSetColor(90, 84, 84, 250);
-	ofDrawCircle(pos, diameter * 0.25);
+	ofSetColor(90, 134, 124, alphaOuter);
+	ofDrawCircle(pos, diameter * 0.5f);
+
+	ofSetColor(90, 84, 84, alphaInner);
+	ofDrawCircle(pos, diameter * 0.25f);
 }
 
 bool Seed::isOffscreen() {

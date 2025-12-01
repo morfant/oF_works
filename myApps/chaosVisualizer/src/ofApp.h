@@ -65,11 +65,12 @@ public:
 
     bool drawThings, ampLatoo, useLines;
 	bool isDragging, overToggle, overSlider;
-	Blackhole* draggingBlackhole = nullptr;
-
-    float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
-	float convergeAmount;
-	int lat_rate;
+		Blackhole* draggingBlackhole = nullptr;
+	
+	    float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
+		float convergeAmount;
+		int lat_rate;
+		float seedMass;
 
     Mover mover;
     vector<Seed> seeds;

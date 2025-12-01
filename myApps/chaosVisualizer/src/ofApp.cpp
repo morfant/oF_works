@@ -21,6 +21,7 @@ void ofApp::setup() {
 	lat_rate = 100;
 	convergeAmount = 0.f;
 	ampLatoo = false;
+	seedMass = 0.1f;
 	useLines = false;
 	drawThings = true;
 
@@ -322,6 +323,7 @@ void ofApp::drawUI()
 	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
 	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
 	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
+	ofDrawBitmapStringHighlight("Seed mass: " + ofToString(seedMass, 3), 20, 340);
 
 }
 
@@ -368,8 +370,26 @@ void ofApp::keyPressed(int key) {
 		useLines = !useLines;
 	}
 	if (key == 's') {
-		// ofLog() << "Seed released!";
-		seeds.push_back(mover.releaseSeed());
+		// 새 Seed를 현재 설정된 질량으로 생성
+		Seed newSeed = mover.releaseSeed();
+		newSeed.mass = seedMass;
+		seeds.push_back(newSeed);
+	}
+
+	// z/x 키로 Seed 질량 조절
+	if (key == 'z') {
+		seedMass = std::max(0.01f, seedMass - 0.01f);
+		for (auto &s : seeds) {
+			s.mass = seedMass;
+		}
+		ofLogNotice() << "Seed mass decreased: " << seedMass;
+	}
+	if (key == 'x') {
+		seedMass = std::min(2.0f, seedMass + 0.01f);
+		for (auto &s : seeds) {
+			s.mass = seedMass;
+		}
+		ofLogNotice() << "Seed mass increased: " << seedMass;
 	}
 
     if (key >= '1' && key <= '9') {
