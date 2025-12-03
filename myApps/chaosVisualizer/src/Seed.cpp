@@ -121,15 +121,16 @@ void Seed::display() {
 	float t = ofClamp(mass, 0.01f, 2.0f);
 	float tn = ofMap(t, 0.01f, 2.0f, 0.0f, 1.0f, true);
 
-	int alphaOuter = ofMap(tn, 0.0f, 1.0f, 40, 255, true);
+	int alphaOuter = ofMap(tn, 0.0f, 1.0f, 100, 255, true);
 	int alphaInner = ofMap(tn, 0.0f, 1.0f, 80, 255, true);
 	float diameter = ofMap(tn, 0.0f, 1.0f, 20.0f, 90.0f, true);
 
-	ofSetColor(90, 134, 124, alphaOuter);
+	// ofSetColor(90, 134, 124, alphaOuter);
+	ofSetColor(220, 184, 84, 200);
 	ofDrawCircle(pos, diameter * 0.5f);
 
-	ofSetColor(90, 84, 84, alphaInner);
-	ofDrawCircle(pos, diameter * 0.25f);
+	// ofSetColor(90, 84, 84, alphaInner);
+	// ofDrawCircle(pos, diameter * 0.25f);
 }
 
 bool Seed::isOffscreen() {

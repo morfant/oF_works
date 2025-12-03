@@ -46,6 +46,56 @@ void Mover::checkEdges(bool blocked) {
     }
 }
 
+// 원형 경계 안에서 튕기기 (Ball::bounceOnCircleBoundary 에서 가져온 로직)
+void Mover::bounceOnCircleBoundary(const ofVec2f& center, float R) {
+    ofVec2f d = pos - center;
+    float dist = d.length();
+    float radius = diameter * 0.5f;
+
+    if (dist > R - radius) {
+        if (dist == 0.0f) return;
+        ofVec2f n = d / dist;
+        float dot = vel.dot(n);
+        // 속도를 법선 방향 기준으로 반사
+        vel = vel - 2.0f * dot * n;
+        // 경계선 안쪽으로 위치 보정
+        pos = center + n * (R - radius);
+    }
+}
+
+// 다른 Mover 와의 충돌 처리 (Ball::collideWith 에서 가져온 로직)
+void Mover::collideWith(Mover& other, float correctionFactor) {
+    ofVec2f d = other.pos - pos;
+    float dist = d.length();
+    float r1 = diameter * 0.5f;
+    float r2 = other.diameter * 0.5f;
+    float minDist = r1 + r2;
+    if (dist == 0.0f) return;
+
+    if (dist < minDist) {
+        ofVec2f n = d / dist;
+
+        // 1) 겹침(overlap) 해소
+        float overlap = minDist - dist;
+        float correction = overlap * correctionFactor;
+
+        pos       -= n * (correction * 0.5f);
+        other.pos += n * (correction * 0.5f);
+
+        // 2) 속도 반사 (동일 질량, 탄성 충돌)
+        ofVec2f dv = vel - other.vel;
+        float vn = dv.dot(n);
+
+        // 서로 멀어지는 중이면 추가 충돌 처리 안 함 (p5.js 코드와 동일한 조건)
+        if (vn > 0.0f) return;
+
+        float impulse = vn; // 동일 질량, e = 1
+
+        vel       -= impulse * n;
+        other.vel += impulse * n;
+    }
+}
+
 bool Mover::isCollidingWith(const Blackhole& b) const {
     return (pos.distance(b.pos) < (diameter / 2 + b.radius));
 }

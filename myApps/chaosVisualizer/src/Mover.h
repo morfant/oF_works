@@ -18,6 +18,8 @@ public:
     void applyForce(const ofVec2f& force);
     void attract(const ofVec2f& target);
     void checkEdges(bool blocked);
+    void bounceOnCircleBoundary(const ofVec2f& center, float R);
+    void collideWith(Mover& other, float correctionFactor);
     bool isCollidingWith(const Blackhole& b) const;
     Seed releaseSeed() const;
 	void warp();

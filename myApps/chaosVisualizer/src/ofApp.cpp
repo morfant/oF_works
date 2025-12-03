@@ -36,16 +36,15 @@ void ofApp::setup() {
 	for (int i = 0; i < ATTR_ITER_NUM; ++i) {
 
 		float initX = ofRandom(-1, 1);
-        float initY = ofRandom(-1, 1);
+		float initY = ofRandom(-1, 1);
 
-        // 각각 조금씩 다른 계수로 다양성 부여
-        float a = lat_a + ofRandom(-0.1, 0.1);
-        float b = lat_b + ofRandom(-0.1, 0.1);
-        float c = lat_c + ofRandom(-0.1, 0.1);
-        float d = lat_d + ofRandom(-0.1, 0.1);
+		// 각각 조금씩 다른 계수로 다양성 부여
+		float a = lat_a + ofRandom(-0.1, 0.1);
+		float b = lat_b + ofRandom(-0.1, 0.1);
+		float c = lat_c + ofRandom(-0.1, 0.1);
+		float d = lat_d + ofRandom(-0.1, 0.1);
 
-        attractorPoints.emplace_back(initX, initY, a, b, c, d);
-
+		attractorPoints.emplace_back(initX, initY, a, b, c, d);
 	}
 
 	// get image data
@@ -54,12 +53,12 @@ void ofApp::setup() {
 	maskImg.load("dolphin.png");
 	assignTargetPositionsFromImage(maskImg, attractorPoints, 150, 4);
 
-
 	// hiddenImg.load("cloud_0301.jpg");
 	hiddenImg.load("dolphin.png");
 	hiddenImg.resize(width, height);
 
-	mover = Mover(ofGetWidth() / 2, ofGetHeight() / 2, 5);
+	// 처음에는 아무 Mover 도 없음; 'c' 키로 생성
+	controllerMoverIndex = -1;
 
 	grid = Grid(30, 20, width, height);
 	// grid = Grid(60, 40, width, height);
@@ -76,6 +75,9 @@ void ofApp::setup() {
 	gui.add(fSlider[1].setup("INIT_Y", lat_y, -5, 5));
 	gui.add(iSlider.setup("LAT_RATE", lat_rate, 10, 48000));
 	gui.add(fSlider[2].setup("CONVERGE", convergeAmount, 0.0, 1.0));
+
+	// Collision correction factor slider (for Mover-Mover collisions)
+	gui.add(correctionSlider.setup("CorrectionFactor", 1.1f, -5.0f, 5.0f));
 
 	fSlider[0].addListener(this, &ofApp::onInitXChanged);
 	fSlider[1].addListener(this, &ofApp::onInitYChanged);
@@ -96,13 +98,11 @@ void ofApp::setup() {
 
 //--------------------------------------------------------------
 void ofApp::update() {
-	mover.update();
+
 	updateParameters();
 
-
-
 	// update AttractorPoint objects
-	for (auto& pt : attractorPoints) {
+	for (auto & pt : attractorPoints) {
 		pt.setParams(lat_a, lat_b, lat_c, lat_d);
 		pt.convergeAmount = convergeAmount;
 		pt.update();
@@ -111,18 +111,31 @@ void ofApp::update() {
 
 	applyBlackholeForce();
 
-	for (auto & b : blackholes)
-	{
-		if (mover.isCollidingWith(b))
-		{
-			mover.warp();
-		}
-	}
+	// for (auto & b : blackholes) {
+	// 	if (mover.isCollidingWith(b)) {
+	// 		mover.warp();
+	// 	}
+	// }
 
 	// Seed remove
 	for (int i = seeds.size() - 1; i >= 0; --i) {
 		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
 			// removeSeedAt(i);
+		}
+	}
+
+	// 원형 경계 안에서 Mover / movers 튕기기
+	ofVec2f center(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f);
+	float R = 220.0f; // p5.js 에서 사용하던 큰 원 반지름과 동일
+	for (auto & m : movers) {
+		m.update();
+		m.bounceOnCircleBoundary(center, R);
+	}
+
+	// movers끼리 간단한 충돌 처리 (GUI에서 correctionFactor 조절)
+	for (std::size_t i = 0; i < movers.size(); ++i) {
+		for (std::size_t j = i + 1; j < movers.size(); ++j) {
+			movers[i].collideWith(movers[j], correctionSlider); // -5.0 ~ 5.0 범위
 		}
 	}
 
@@ -138,12 +151,26 @@ void ofApp::draw() {
 
 	// grid.display(0);
 
-	mover.draw(false);
+	for (std::size_t i = 0; i < movers.size(); ++i) {
+		auto & m = movers[i];
+		m.draw(false);
+
+		// 컨트롤러 Mover 인 경우 노란색 원으로 강조 표시
+		if ((int)i == controllerMoverIndex) {
+			ofPushStyle();
+			ofNoFill();
+			ofSetColor(255, 255, 0);
+			ofSetLineWidth(2.0f);
+			float highlightRadius = m.diameter * 0.5f + 4.0f; // 본체보다 약간 크게
+			ofDrawCircle(m.pos, highlightRadius);
+			ofPopStyle();
+		}
+	}
+
 	for (auto & s : seeds)
 		s.display();
 
-	if (drawThings)
-	{
+	if (drawThings) {
 		for (auto & b : blackholes)
 			b.display();
 	}
@@ -155,18 +182,86 @@ void ofApp::draw() {
 	ofClear(0, 0, 0, 0);
 
 	ofPushMatrix();
-    ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
-    ofSetColor(255);
+	ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
+	ofSetColor(255);
 
-    for (auto& pt : attractorPoints) {
-        pt.draw(useLines);
-    }
+	for (auto & pt : attractorPoints) {
+		pt.draw(useLines);
+	}
 
-    ofPopMatrix();
+	ofPopMatrix();
 
 	attractorFbo.end();
 	attractorFbo.draw(0, 0);
 
+	// 원형 경계 시각화
+	ofPushStyle();
+	ofNoFill();
+	ofSetColor(180);
+	ofSetLineWidth(2.0f);
+	float R = 220.0f;
+	ofDrawCircle(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f, R);
+	ofPopStyle();
+
+	// --- 모든 블랙홀들의 합력 방향을 시각화: 화면 전체에 화살표 필드 ---
+	{
+		ofPushStyle();
+		ofSetColor(255, 0, 0);
+		ofSetLineWidth(2.0f);
+
+		int spacing = 80; // 화살표 간격 (픽셀)
+		float fieldScale = 500000.0f; // 힘 → 픽셀 길이 스케일
+		float maxLenFactor = 0.4f;    // 한 셀 안에서 최대 길이 비율
+
+		for (int gy = spacing / 2; gy < height; gy += spacing) {
+			for (int gx = spacing / 2; gx < width; gx += spacing) {
+
+				ofVec2f pos(gx, gy);
+				ofVec2f totalForce(0, 0);
+
+				// 이 지점에서의 블랙홀 합력 계산
+				for (auto & b : blackholes) {
+					ofVec2f dir = b.pos - pos;
+					float distSq = dir.lengthSquared();
+					if (distSq > 0.0001f) { // 0 나누기 방지
+						dir.normalize();
+						float strength = 10.0f / distSq; // 1/r^2 로 감소하는 힘
+						totalForce += dir * strength;
+					}
+				}
+
+				if (totalForce.lengthSquared() > 0.0f) {
+					float forceMag = totalForce.length();
+
+					// 길이 스케일링: 힘의 크기를 픽셀 길이로 변환
+					float maxLen = spacing * maxLenFactor; // 주위 화살표와 안 겹치도록
+					float len    = forceMag * fieldScale;
+					len = ofClamp(len, 0.0f, maxLen);
+
+					// 애니메이션: 길이를 살짝 펄싱
+					float t     = ofGetElapsedTimef();
+					float pulse = 0.8f + 0.2f * sin(t * 2.0f);
+					len *= pulse;
+
+					ofVec2f dirNorm = totalForce.getNormalized();
+					ofVec2f endPos  = pos + dirNorm * len;
+
+					// 본체 선
+					ofDrawLine(pos, endPos);
+
+					// 화살표 머리
+					float headSize = 6.0f;
+					ofVec2f perp(-dirNorm.y, dirNorm.x);
+					ofVec2f tip   = endPos;
+					ofVec2f left  = endPos - dirNorm * headSize + perp * (headSize * 0.5f);
+					ofVec2f right = endPos - dirNorm * headSize - perp * (headSize * 0.5f);
+					ofDrawTriangle(tip, left, right);
+				}
+			}
+		}
+
+		ofPopStyle();
+	}
 
 	// check for the data from the image
 	// drawTargetPositions(attractorPoints);
@@ -176,38 +271,67 @@ void ofApp::draw() {
 	// ofLog() << "draw is done!";
 }
 
-
 void ofApp::updateParameters() {
-	lat_a = ofMap(mover.pos.x, 0, width, 0.2, 3.0);
-	lat_b = ofMap(mover.pos.y, 0, height, 0.2, 3.0);
-	lat_c = ofMap(mover.pos.x, 0, width, 0.5, 1.5);
-	lat_d = ofMap(mover.pos.y, 0, height, 0.5, 1.5);
+	// 어떤 mover 를 참조할지: controllerMoverIndex 로 선택
+	if (movers.empty() || controllerMoverIndex < 0 || controllerMoverIndex >= (int)movers.size()) {
+		return; // 아직 컨트롤러가 없으면 파라미터를 갱신하지 않음
+	}
+	const Mover & controller = movers[controllerMoverIndex];
 
+	lat_a = ofMap(controller.pos.x, 0, width, 0.2, 3.0);
+	lat_b = ofMap(controller.pos.y, 0, height, 0.2, 3.0);
+	lat_c = ofMap(controller.pos.x, 0, width, 0.5, 1.5);
+	lat_d = ofMap(controller.pos.y, 0, height, 0.5, 1.5);
 
 	if (ampLatoo) {
 		sendLatooParams();
-	};
+	}
 }
 
+// Applay force from nearest blackhole
+// void ofApp::applyBlackholeForce() {
+// 	// 모든 mover에 대해 블랙홀 힘 적용
+// 	for (auto & m : movers) {
+// 		Blackhole * nearest = nullptr;
+// 		float minDist = std::numeric_limits<float>::max();
+
+// 		for (auto & b : blackholes) {
+// 			float d = ofDist(m.pos.x, m.pos.y, b.pos.x, b.pos.y);
+// 			if (d < minDist) {
+// 				minDist = d;
+// 				nearest = &b;
+// 			}
+// 		}
+
+// 		if (nearest != nullptr) {
+// 			ofVec2f force = nearest->pos - m.pos;
+// 			force.normalize();
+// 			force *= 0.2;
+// 			m.applyForce(force);
+// 		}
+// 	}
+// }
+
+
+// Apply summed force of all blackholes
 void ofApp::applyBlackholeForce() {
-	Blackhole * nearest = nullptr;
-	float minDist = std::numeric_limits<float>::max();
+    for (auto & m : movers) {
 
-	for (auto & b : blackholes) {
-		float d = ofDist(mover.pos.x, mover.pos.y, b.pos.x, b.pos.y);
-		if (d < minDist) {
-			minDist = d;
-			nearest = &b;
-		}
-		// b.display(); // 만약 display()가 const 함수면, b를 const 참조로 받아야 함
-	}
+        ofVec2f totalForce(0, 0);
 
-	if (nearest != nullptr) {
-		ofVec2f force = nearest->pos - mover.pos;
-		force.normalize();
-		force *= 0.2;
-		mover.applyForce(force);
-	}
+        for (auto & b : blackholes) {
+            ofVec2f dir = b.pos - m.pos;
+            float distSq = dir.lengthSquared();
+            if (distSq > 0.0001f) { // 0 나누기 방지
+                dir.normalize();
+                // 예시: 1/r^2 로 약해지는 힘
+                float strength = 10.0f / distSq; 
+                totalForce += dir * strength;
+            }
+        }
+
+        m.applyForce(totalForce);
+    }
 }
 
 void ofApp::renderAttractor() {
@@ -251,66 +375,72 @@ void ofApp::renderAttractor() {
 void ofApp::updateGridFromAmp() {
 	float normAmp = ofClamp(ampFromSC, 0.0f, 1.0f); // 0~1 범위로 정규화
 
-	// 예: mover 위치 기준으로 셀에 값을 매핑
-	grid.setValueAt(mover.pos.x, mover.pos.y, normAmp * 10);
+	// 모든 mover 위치 기준으로 셀에 값을 매핑
+	for (auto & m : movers) {
+		grid.setValueAt(m.pos.x, m.pos.y, normAmp * 10);
+	}
 
-	// 예: 주변 3x3 영역 셀에도 값 퍼뜨리기 (부드러운 반응)
-	// for (int dx = -1; dx <= 1; dx++) {
-	// 	for (int dy = -1; dy <= 1; dy++) {
-	// 		float x = mover.pos.x + dx * grid.cellW;
-	// 		float y = mover.pos.y + dy * grid.cellH;
-	// 		grid.setValueAt(x, y, normAmp * 0.7f); // 중심보다 약하게
+	// 예: 주변 3x3 영역 셀에도 값 퍼뜨리기 (부드러운 반응)를 쓰고 싶다면,
+	// 각 mover에 대해 아래 루프를 돌릴 수 있음 (현재는 주석 처리):
+	// for (auto & m : movers) {
+	// 	for (int dx = -1; dx <= 1; dx++) {
+	// 		for (int dy = -1; dy <= 1; dy++) {
+	// 			float x = m.pos.x + dx * grid.cellW;
+	// 			float y = m.pos.y + dy * grid.cellH;
+	// 			grid.setValueAt(x, y, normAmp * 0.7f); // 중심보다 약하게
+	// 		}
 	// 	}
 	// }
 
 	// (선택) Reveal 형태를 쓰고 싶다면 아래처럼:
-	// grid.revealValue(mover.pos.x, mover.pos.y);
+	// for (auto & m : movers) {
+	// 	grid.revealValue(m.pos.x, m.pos.y);
+	// }
 }
 
-void ofApp::assignTargetPositionsFromImage(const ofImage& img,
-	std::vector<AttractorPoint>& points,
+void ofApp::assignTargetPositionsFromImage(const ofImage & img,
+	std::vector<AttractorPoint> & points,
 	float threshold, int step) {
-    vector<ofVec2f> targetPositions;
+	vector<ofVec2f> targetPositions;
 
-    for (int y = 0; y < img.getHeight(); y += step) {
-        for (int x = 0; x < img.getWidth(); x += step) {
-            float brightness = img.getColor(x, y).getBrightness();
-            if (brightness < threshold) {
-                float normX = ofMap(x, 0, img.getWidth(), -1, 1);
-                float normY = ofMap(y, 0, img.getHeight(), -1, 1);
-                targetPositions.emplace_back(normX, normY);
-            }
-        }
-    }
+	for (int y = 0; y < img.getHeight(); y += step) {
+		for (int x = 0; x < img.getWidth(); x += step) {
+			float brightness = img.getColor(x, y).getBrightness();
+			if (brightness < threshold) {
+				float normX = ofMap(x, 0, img.getWidth(), -1, 1);
+				float normY = ofMap(y, 0, img.getHeight(), -1, 1);
+				targetPositions.emplace_back(normX, normY);
+			}
+		}
+	}
 
 	// 새로운 C++ 방식: std::shuffle + 랜덤 엔진
-    std::random_device rd;
-    std::mt19937 g(rd());
-    std::shuffle(targetPositions.begin(), targetPositions.end(), g);
+	std::random_device rd;
+	std::mt19937 g(rd());
+	std::shuffle(targetPositions.begin(), targetPositions.end(), g);
 
-    for (int i = 0; i < points.size(); i++) {
-        if (i < targetPositions.size()) {
-            points[i].targetPos = targetPositions[i];
-        }
-    }
+	for (int i = 0; i < points.size(); i++) {
+		if (i < targetPositions.size()) {
+			points[i].targetPos = targetPositions[i];
+		}
+	}
 }
 
-void ofApp::drawTargetPositions(const std::vector<AttractorPoint>& points) {
-    ofPushMatrix();
-    ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2); // 중심 기준으로
+void ofApp::drawTargetPositions(const std::vector<AttractorPoint> & points) {
+	ofPushMatrix();
+	ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2); // 중심 기준으로
 
-    ofSetColor(255, 0, 0, 100);  // 빨간색, 투명도 약간
-    for (const auto& pt : points) {
-        float x = ofMap(pt.targetPos.x, -1, 1, -ofGetWidth()/2, ofGetWidth()/2);
-        float y = ofMap(pt.targetPos.y, -1, 1, -ofGetHeight()/2, ofGetHeight()/2);
-        ofDrawCircle(x, y, 2); // 작고 연한 점
-    }
+	ofSetColor(255, 0, 0, 100); // 빨간색, 투명도 약간
+	for (const auto & pt : points) {
+		float x = ofMap(pt.targetPos.x, -1, 1, -ofGetWidth() / 2, ofGetWidth() / 2);
+		float y = ofMap(pt.targetPos.y, -1, 1, -ofGetHeight() / 2, ofGetHeight() / 2);
+		ofDrawCircle(x, y, 2); // 작고 연한 점
+	}
 
-    ofPopMatrix();
+	ofPopMatrix();
 }
 
-void ofApp::drawUI()
-{
+void ofApp::drawUI() {
 	// UI
 	gui.draw();
 
@@ -324,7 +454,7 @@ void ofApp::drawUI()
 	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
 	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
 	ofDrawBitmapStringHighlight("Seed mass: " + ofToString(seedMass, 3), 20, 340);
-
+	ofDrawBitmapStringHighlight("Movers: " + ofToString(movers.size()), 20, 360);
 }
 
 void ofApp::onInitXChanged(float & val) {
@@ -369,49 +499,78 @@ void ofApp::keyPressed(int key) {
 		ofLog() << "Line mode toggle: " << useLines;
 		useLines = !useLines;
 	}
+
 	if (key == 's') {
-		// 새 Seed를 현재 설정된 질량으로 생성
-		Seed newSeed = mover.releaseSeed();
-		newSeed.mass = seedMass;
-		seeds.push_back(newSeed);
+		// 새 Seed를 현재 컨트롤러 mover 로부터 생성
+		if (!movers.empty() && controllerMoverIndex >= 0 && controllerMoverIndex < (int)movers.size()) {
+			Seed newSeed = movers[controllerMoverIndex].releaseSeed();
+			newSeed.mass = seedMass;
+			seeds.push_back(newSeed);
+		} else {
+			ofLogNotice() << "No controller mover set; press 'c' to create one first.";
+		}
 	}
 
 	// z/x 키로 Seed 질량 조절
 	if (key == 'z') {
 		seedMass = std::max(0.01f, seedMass - 0.01f);
-		for (auto &s : seeds) {
+		for (auto & s : seeds) {
 			s.mass = seedMass;
 		}
 		ofLogNotice() << "Seed mass decreased: " << seedMass;
 	}
 	if (key == 'x') {
 		seedMass = std::min(2.0f, seedMass + 0.01f);
-		for (auto &s : seeds) {
+		for (auto & s : seeds) {
 			s.mass = seedMass;
 		}
 		ofLogNotice() << "Seed mass increased: " << seedMass;
 	}
 
-    if (key >= '1' && key <= '9') {
-        int number = key - '0'; // '1' → 1
+	if (key >= '1' && key <= '9') {
+		int number = key - '0'; // '1' → 1
 
-        // 이미 존재하는지 확인
-        auto it = std::find_if(blackholes.begin(), blackholes.end(),
-            [number](const Blackhole& b) {
-                return b.id == number;
-            });
+		// 이미 존재하는지 확인
+		auto it = std::find_if(blackholes.begin(), blackholes.end(),
+			[number](const Blackhole & b) {
+				return b.id == number;
+			});
 
-        if (it != blackholes.end()) {
-            ofLogNotice() << "Removing Blackhole #" << number;
-            blackholes.erase(it);
-        } else {
-            float bx = ofGetMouseX();
-            float by = ofGetMouseY();
-            ofLogNotice() << "Adding Blackhole #" << number;
-            blackholes.emplace_back(bx, by, number);
-        }
-    }
+		if (it != blackholes.end()) {
+			ofLogNotice() << "Removing Blackhole #" << number;
+			blackholes.erase(it);
+		} else {
+			float bx = ofGetMouseX();
+			float by = ofGetMouseY();
+			ofLogNotice() << "Adding Blackhole #" << number;
+			blackholes.emplace_back(bx, by, number);
+		}
+	}
 
+	// 'c' 키: 새로운 Mover 추가
+	if (key == 'c') {
+		ofVec2f center(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f);
+		float R = 220.0f;
+		Mover m(ofGetWidth() / 2, ofGetHeight() / 2, 5);
+		// 원 내부의 랜덤 위치로 이동
+		float angle = ofRandom(TWO_PI);
+		float rad = ofRandom(R);
+		m.pos.set(center.x + cos(angle) * rad,
+			center.y + sin(angle) * rad);
+		movers.push_back(m);
+
+		// 첫 번째로 생성된 mover 를 controller 로 사용
+		if (controllerMoverIndex < 0) {
+			controllerMoverIndex = static_cast<int>(movers.size()) - 1;
+		}
+	}
+
+	// 'v' 키: 마지막 Mover 하나 제거
+	if (key == 'v') {
+		if (!movers.empty()) {
+			movers.pop_back();
+		}
+	}
 }
 
 //--------------------------------------------------------------

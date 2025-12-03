@@ -72,7 +72,11 @@ public:
 		int lat_rate;
 		float seedMass;
 
-    Mover mover;
+	Mover mover;              // 원래 있던 메인 Mover
+	std::vector<Mover> movers;   // 키로 추가/삭제하는 extra Mover들
+	int controllerMoverIndex;    // which mover controls updateParameters & forces (-1 = none)
+
+
     vector<Seed> seeds;
     vector<Blackhole> blackholes;
     Grid grid;
@@ -83,6 +87,7 @@ public:
 	// UI
 	ofxPanel gui;
 	ofxFloatSlider fSlider[3];    // Float 타입 슬라이더
+	ofxFloatSlider correctionSlider;
 	ofxIntSlider iSlider;    // Int 타입 슬라이더
 	ofxToggle toggle;
 	ofxToggle toggleDraw;
