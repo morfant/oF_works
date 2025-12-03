@@ -1,6 +1,8 @@
 // ofApp.cpp
 #include "ofApp.h"
 
+static const float MAIN_CIRCLE_RADIUS = 460.0f; // 기존 220.0f 에서 확장된 원 경계 반지름
+
 //--------------------------------------------------------------
 void ofApp::setup() {
 	ofSetFrameRate(60);
@@ -49,24 +51,46 @@ void ofApp::setup() {
 
 	// get image data
 	// Do this after creating AttractorPoint objects
-	ofImage maskImg;
-	maskImg.load("dolphin.png");
-	assignTargetPositionsFromImage(maskImg, attractorPoints, 150, 4);
+	// ofImage maskImg;
+	// maskImg.load("dolphin.png");
+	// assignTargetPositionsFromImage(maskImg, attractorPoints, 150, 4);
 
 	// hiddenImg.load("cloud_0301.jpg");
-	hiddenImg.load("dolphin.png");
-	hiddenImg.resize(width, height);
+	// hiddenImg.load("dolphin.png");
+	// hiddenImg.resize(width, height);
 
 	// 처음에는 아무 Mover 도 없음; 'c' 키로 생성
 	controllerMoverIndex = -1;
 
-	grid = Grid(30, 20, width, height);
+	// grid = Grid(30, 20, width, height);
 	// grid = Grid(60, 40, width, height);
 	// grid = Grid(120, 80, width, height);
-	grid.setFromImage(hiddenImg);
-	grid.reset();
+	// grid.setFromImage(hiddenImg);
+	// grid.reset();
 
-	blackholes.push_back(Blackhole(ofGetWidth() * 2 / 3, ofGetHeight() / 3, 1));
+	// blackholes.push_back(Blackhole(ofGetWidth() * 2 / 3, ofGetHeight() / 3, 1));
+
+	// 원의 경계 바깥을 둘러싼 링 형태로 72개의 블랙홀 생성
+	{
+		int numRingBH = 18;
+		float R_inner = MAIN_CIRCLE_RADIUS; // 메인 원 반지름
+		float ringMargin = 40.0f; // 메인 원보다 얼마나 바깥에 둘 것인지
+		float R_outer = R_inner + ringMargin;
+
+		float cx = width * 0.5f;
+		float cy = height * 0.5f;
+
+		for (int i = 0; i < numRingBH; ++i) {
+			float angleDeg = i * (360.0f / numRingBH);
+			float angleRad = ofDegToRad(angleDeg);
+
+			float x = cx + cos(angleRad) * R_outer;
+			float y = cy + sin(angleRad) * R_outer;
+
+			// id는 1..72로 부여
+			blackholes.emplace_back(x, y, i + 1);
+		}
+	}
 
 	// UI
 	gui.setup("GUI");
@@ -84,12 +108,42 @@ void ofApp::setup() {
 	iSlider.addListener(this, &ofApp::onRateChanged);
 	fSlider[2].addListener(this, &ofApp::onConvergeChanged);
 
+	// --- Global blackhole force controls ---
+	// 1st stage: overall strength range scaling (Perlin output)
+	strengthRangeScale = 1.0f;
+	gui.add(strengthRangeScaleSlider.setup("Strength Range Scale",
+		strengthRangeScale,
+		0.1f, 5.0f));
+	strengthRangeScaleSlider.addListener(this, &ofApp::onStrengthRangeScaleChanged);
+
+	// 2nd stage: base (1/r^2) force scaling
+	forceBaseScale = 1.0f;
+	gui.add(forceBaseScaleSlider.setup("Force Base Scale",
+		forceBaseScale,
+		0.1f, 5.0f));
+	forceBaseScaleSlider.addListener(this, &ofApp::onForceBaseScaleChanged);
+
 	gui.add(toggle.setup("Amp On", ampLatoo));
 	toggle.addListener(this, &ofApp::onToggleChanged);
 
-	gui.add(toggleDraw.setup("Draw things", drawThings));
+	// 블랙홀 그리기 토글
+	gui.add(toggleDraw.setup("Draw Blackholes", drawThings));
 	toggleDraw.addListener(this, &ofApp::onToggleDrawThings);
 
+	// Latoocarfian attractor(배경) 그리기 토글
+	drawAttractor = false;
+	gui.add(toggleAttractor.setup("Draw Attractor", drawAttractor));
+	toggleAttractor.addListener(this, &ofApp::onToggleAttractor);
+
+	// Toggle for drawing the force-field arrows
+	drawFieldArrows = true;
+	gui.add(toggleFieldArrows.setup("Field Arrows", drawFieldArrows));
+	toggleFieldArrows.addListener(this, &ofApp::onToggleFieldArrows);
+
+	// Toggle for drawing the field dots at arrow tips
+	drawFieldDots = false;
+	gui.add(toggleFieldDots.setup("Field Dots", drawFieldDots));
+	toggleFieldDots.addListener(this, &ofApp::onToggleFieldDots);
 
 	// Init values
 	sendLatooInit();
@@ -109,6 +163,21 @@ void ofApp::update() {
 		pt.resetPos();
 	}
 
+	// Perlin 노이즈로 각 블랙홀 strength 갱신
+	{
+		float t = ofGetElapsedTimef();
+
+		float timeScale = 0.15f; // 시간이 흐르는 속도
+		float indexScale = 0.05f; // 링을 따라 strength 패턴이 얼마나 빨리 변하는지
+		float minStrength = 0.2f; // 최소 인력
+		float maxStrength = 10.0f; // 최대 인력
+
+		for (int i = 0; i < (int)blackholes.size(); ++i) {
+			float n = ofNoise(t * timeScale, i * indexScale);
+			float baseStrength = ofMap(n, 0.0f, 1.0f, minStrength, maxStrength);
+			blackholes[i].strength = baseStrength * strengthRangeScale; // 1차 글로벌 스케일
+		}
+	}
 	applyBlackholeForce();
 
 	// for (auto & b : blackholes) {
@@ -126,7 +195,7 @@ void ofApp::update() {
 
 	// 원형 경계 안에서 Mover / movers 튕기기
 	ofVec2f center(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f);
-	float R = 220.0f; // p5.js 에서 사용하던 큰 원 반지름과 동일
+	float R = MAIN_CIRCLE_RADIUS; // 메인 원 반지름
 	for (auto & m : movers) {
 		m.update();
 		m.bounceOnCircleBoundary(center, R);
@@ -150,6 +219,77 @@ void ofApp::draw() {
 	// hiddenImg.draw(0, 0); // 이미지 그리기
 
 	// grid.display(0);
+
+	// --- 모든 블랙홀들의 합력 방향을 시각화: 화면 전체에 화살표 필드 ---
+	{
+		ofPushStyle();
+		ofSetLineWidth(2.0f);
+
+		int spacing = 20; // 화살표 간격 (픽셀)
+		float fieldScale = 900000.0f; // 힘 → 픽셀 길이 스케일
+		float maxLenFactor = 1.0f; // 한 셀 안에서 최대 길이 비율
+
+		for (int gy = spacing / 2; gy < height; gy += spacing) {
+			for (int gx = spacing / 2; gx < width; gx += spacing) {
+
+				ofVec2f pos(gx, gy);
+				ofVec2f totalForce(0, 0);
+
+				// 이 지점에서의 블랙홀 합력 계산
+				for (auto & b : blackholes) {
+					ofVec2f dir = b.pos - pos;
+					float distSq = dir.lengthSquared();
+					if (distSq > 0.0001f) { // 0 나누기 방지
+						dir.normalize();
+						float base = (10.0f * forceBaseScale) / distSq; // 1/r^2 기본 힘에 글로벌 스케일 적용
+						float s = b.strength; // Perlin 노이즈로 제어된 개별 블랙홀 힘
+						totalForce += dir * base * s;
+					}
+				}
+
+				if (totalForce.lengthSquared() > 0.0f) {
+					float forceMag = totalForce.length();
+
+					// 길이 스케일링: 힘의 크기를 픽셀 길이로 변환
+					float maxLen = spacing * maxLenFactor; // 주위 화살표와 안 겹치도록
+					float len = forceMag * fieldScale;
+					len = ofClamp(len, 0.0f, maxLen);
+
+					// 애니메이션: 길이를 살짝 펄싱
+					float t = ofGetElapsedTimef();
+					float pulse = 0.8f + 0.2f * sin(t * 2.0f);
+					// len *= pulse;
+
+					ofVec2f dirNorm = totalForce.getNormalized();
+					ofVec2f endPos = pos + dirNorm * len;
+
+					// 1) 화살표 (선 + 머리)는 drawFieldArrows 가 true 일 때만
+					if (drawFieldArrows) {
+						// 본체 선
+						ofSetColor(0, 80, 100);
+						ofDrawLine(pos, endPos);
+
+						// 화살표 머리
+						float headSize = 6.0f;
+						ofVec2f perp(-dirNorm.y, dirNorm.x);
+						ofVec2f tip = endPos;
+						ofVec2f left = endPos - dirNorm * headSize + perp * (headSize * 0.5f);
+						ofVec2f right = endPos - dirNorm * headSize - perp * (headSize * 0.5f);
+						ofDrawTriangle(tip, left, right);
+					}
+
+					// 2) 화살표 끝의 하얀 동그라미는 drawFieldDots 가 true 일 때만
+					if (drawFieldDots) {
+						ofSetColor(255, 255, 255, drawFieldArrows ? 120 : 200);
+						float radius = drawFieldArrows ? 3.5f : 2.0f;
+						ofDrawCircle(endPos, radius);
+					}
+				}
+			}
+		}
+
+		ofPopStyle();
+	}
 
 	for (std::size_t i = 0; i < movers.size(); ++i) {
 		auto & m = movers[i];
@@ -175,94 +315,35 @@ void ofApp::draw() {
 			b.display();
 	}
 
-	renderAttractor();
+	if (drawAttractor) {
+		renderAttractor();
 
-	// draw AttractorPoint objects
-	attractorFbo.begin();
-	ofClear(0, 0, 0, 0);
+		// draw AttractorPoint objects
+		attractorFbo.begin();
+		ofClear(0, 0, 0, 0);
 
-	ofPushMatrix();
-	ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
-	ofSetColor(255);
+		ofPushMatrix();
+		ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
+		ofSetColor(255);
 
-	for (auto & pt : attractorPoints) {
-		pt.draw(useLines);
+		for (auto & pt : attractorPoints) {
+			pt.draw(useLines);
+		}
+
+		ofPopMatrix();
+
+		attractorFbo.end();
+		attractorFbo.draw(0, 0);
 	}
-
-	ofPopMatrix();
-
-	attractorFbo.end();
-	attractorFbo.draw(0, 0);
 
 	// 원형 경계 시각화
 	ofPushStyle();
 	ofNoFill();
 	ofSetColor(180);
 	ofSetLineWidth(2.0f);
-	float R = 220.0f;
+	float R = MAIN_CIRCLE_RADIUS;
 	ofDrawCircle(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f, R);
 	ofPopStyle();
-
-	// --- 모든 블랙홀들의 합력 방향을 시각화: 화면 전체에 화살표 필드 ---
-	{
-		ofPushStyle();
-		ofSetColor(255, 0, 0);
-		ofSetLineWidth(2.0f);
-
-		int spacing = 80; // 화살표 간격 (픽셀)
-		float fieldScale = 500000.0f; // 힘 → 픽셀 길이 스케일
-		float maxLenFactor = 0.4f;    // 한 셀 안에서 최대 길이 비율
-
-		for (int gy = spacing / 2; gy < height; gy += spacing) {
-			for (int gx = spacing / 2; gx < width; gx += spacing) {
-
-				ofVec2f pos(gx, gy);
-				ofVec2f totalForce(0, 0);
-
-				// 이 지점에서의 블랙홀 합력 계산
-				for (auto & b : blackholes) {
-					ofVec2f dir = b.pos - pos;
-					float distSq = dir.lengthSquared();
-					if (distSq > 0.0001f) { // 0 나누기 방지
-						dir.normalize();
-						float strength = 10.0f / distSq; // 1/r^2 로 감소하는 힘
-						totalForce += dir * strength;
-					}
-				}
-
-				if (totalForce.lengthSquared() > 0.0f) {
-					float forceMag = totalForce.length();
-
-					// 길이 스케일링: 힘의 크기를 픽셀 길이로 변환
-					float maxLen = spacing * maxLenFactor; // 주위 화살표와 안 겹치도록
-					float len    = forceMag * fieldScale;
-					len = ofClamp(len, 0.0f, maxLen);
-
-					// 애니메이션: 길이를 살짝 펄싱
-					float t     = ofGetElapsedTimef();
-					float pulse = 0.8f + 0.2f * sin(t * 2.0f);
-					len *= pulse;
-
-					ofVec2f dirNorm = totalForce.getNormalized();
-					ofVec2f endPos  = pos + dirNorm * len;
-
-					// 본체 선
-					ofDrawLine(pos, endPos);
-
-					// 화살표 머리
-					float headSize = 6.0f;
-					ofVec2f perp(-dirNorm.y, dirNorm.x);
-					ofVec2f tip   = endPos;
-					ofVec2f left  = endPos - dirNorm * headSize + perp * (headSize * 0.5f);
-					ofVec2f right = endPos - dirNorm * headSize - perp * (headSize * 0.5f);
-					ofDrawTriangle(tip, left, right);
-				}
-			}
-		}
-
-		ofPopStyle();
-	}
-
 	// check for the data from the image
 	// drawTargetPositions(attractorPoints);
 
@@ -312,26 +393,29 @@ void ofApp::updateParameters() {
 // 	}
 // }
 
-
-// Apply summed force of all blackholes
+// Apply summed force of all blackholes (with Perlin-controlled strength)
 void ofApp::applyBlackholeForce() {
-    for (auto & m : movers) {
+	for (auto & m : movers) {
 
-        ofVec2f totalForce(0, 0);
+		ofVec2f totalForce(0, 0);
 
-        for (auto & b : blackholes) {
-            ofVec2f dir = b.pos - m.pos;
-            float distSq = dir.lengthSquared();
-            if (distSq > 0.0001f) { // 0 나누기 방지
-                dir.normalize();
-                // 예시: 1/r^2 로 약해지는 힘
-                float strength = 10.0f / distSq; 
-                totalForce += dir * strength;
-            }
-        }
+		for (auto & b : blackholes) {
 
-        m.applyForce(totalForce);
-    }
+			ofVec2f dir = b.pos - m.pos;
+			// ofVec2f dir = m.pos - b.pos; // repulsive: 블랙홀에서 밀어내는 방향
+			
+			float distSq = dir.lengthSquared();
+			if (distSq > 0.0001f) { // 0 나누기 방지
+				dir.normalize();
+				// 기본 1/r^2 에 각 블랙홀의 strength 를 곱해줌
+				float base = (10.0f * forceBaseScale) / distSq; // 2차 글로벌 스케일
+				float s = b.strength;
+				totalForce += dir * base * s;
+			}
+		}
+
+		m.applyForce(totalForce);
+	}
 }
 
 void ofApp::renderAttractor() {
@@ -446,15 +530,15 @@ void ofApp::drawUI() {
 
 	// ---- Debug Info: lat params & FPS ----
 	ofSetColor(255);
-	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 200);
-	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 220);
-	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 240);
-	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 260);
-	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 280);
-	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 300);
-	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 320);
-	ofDrawBitmapStringHighlight("Seed mass: " + ofToString(seedMass, 3), 20, 340);
-	ofDrawBitmapStringHighlight("Movers: " + ofToString(movers.size()), 20, 360);
+	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 420);
+	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 440);
+	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 460);
+	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 480);
+	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 500);
+	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 520);
+	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 540);
+	ofDrawBitmapStringHighlight("Seed mass: " + ofToString(seedMass, 3), 20, 560);
+	ofDrawBitmapStringHighlight("Movers: " + ofToString(movers.size()), 20, 580);
 }
 
 void ofApp::onInitXChanged(float & val) {
@@ -476,6 +560,14 @@ void ofApp::onConvergeChanged(float & val) {
 	convergeAmount = val;
 }
 
+void ofApp::onStrengthRangeScaleChanged(float & val) {
+	strengthRangeScale = val;
+}
+
+void ofApp::onForceBaseScaleChanged(float & val) {
+	forceBaseScale = val;
+}
+
 void ofApp::onToggleChanged(bool & val) {
 	ampLatoo = val;
 
@@ -491,6 +583,18 @@ void ofApp::onToggleChanged(bool & val) {
 void ofApp::onToggleDrawThings(bool & val) {
 	drawThings = val;
 	ofLog() << drawThings;
+}
+
+void ofApp::onToggleFieldArrows(bool & val) {
+	drawFieldArrows = val;
+}
+
+void ofApp::onToggleFieldDots(bool & val) {
+	drawFieldDots = val;
+}
+
+void ofApp::onToggleAttractor(bool & val) {
+	drawAttractor = val;
 }
 
 //--------------------------------------------------------------
@@ -550,7 +654,7 @@ void ofApp::keyPressed(int key) {
 	// 'c' 키: 새로운 Mover 추가
 	if (key == 'c') {
 		ofVec2f center(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f);
-		float R = 220.0f;
+		float R = MAIN_CIRCLE_RADIUS;
 		Mover m(ofGetWidth() / 2, ofGetHeight() / 2, 5);
 		// 원 내부의 랜덤 위치로 이동
 		float angle = ofRandom(TWO_PI);
