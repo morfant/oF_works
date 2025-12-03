@@ -19,7 +19,7 @@ obj/
 *.xcodeproj/
 *.xcworkspace/
 build/
-Project.xcconfig
+**/*.xcconfig
 
 # Backup and autosave
 *~
@@ -33,7 +33,7 @@ CMakeCache.txt
 CMakeFiles/
 Makefile
 cmake_install.cmake
-*.make
+**/*.make
 
 # Log files
 *.log
@@ -50,3 +50,4 @@ output.mp4
 # VS Code 설정 (선택사항)
 .vscode/
 *.plist
+**/*.code-workspace
