@@ -51,3 +51,4 @@ output.mp4
 .vscode/
 *.plist
 **/*.code-workspace
+**/of.entitlements
