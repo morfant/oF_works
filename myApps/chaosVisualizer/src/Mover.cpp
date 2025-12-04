@@ -64,13 +64,13 @@ void Mover::bounceOnCircleBoundary(const ofVec2f& center, float R) {
 }
 
 // 다른 Mover 와의 충돌 처리 (Ball::collideWith 에서 가져온 로직)
-void Mover::collideWith(Mover& other, float correctionFactor) {
+bool Mover::collideWith(Mover& other, float correctionFactor) {
     ofVec2f d = other.pos - pos;
     float dist = d.length();
     float r1 = diameter * 0.5f;
     float r2 = other.diameter * 0.5f;
     float minDist = r1 + r2;
-    if (dist == 0.0f) return;
+    if (dist == 0.0f) return false;
 
     if (dist < minDist) {
         ofVec2f n = d / dist;
@@ -87,13 +87,18 @@ void Mover::collideWith(Mover& other, float correctionFactor) {
         float vn = dv.dot(n);
 
         // 서로 멀어지는 중이면 추가 충돌 처리 안 함 (p5.js 코드와 동일한 조건)
-        if (vn > 0.0f) return;
+        if (vn > 0.0f) {
+            return true; // still count as collision because we resolved overlap
+        }
 
         float impulse = vn; // 동일 질량, e = 1
 
         vel       -= impulse * n;
         other.vel += impulse * n;
+        return true;
     }
+
+    return false;
 }
 
 bool Mover::isCollidingWith(const Blackhole& b) const {

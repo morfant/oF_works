@@ -9,8 +9,23 @@
 
 a =Synth(\latooConv, [\buf, ~ambi])
 
+Synth(\tick)
+
 (
 // Synthdef
+var count = 0;
+SynthDef(\tick, {
+    |freq = 100, pan = 0, gate = 1, amp = 0.001|
+
+    var sig, env;
+    sig = SinOsc.ar(freq, phase: 2pi.rand);
+    env = EnvGen.kr(Env.perc(0.0001, 0.001), gate, doneAction: 2);
+
+    Out.ar(0, Pan2.ar(sig * env, pan, amp));
+
+}).add;
+
+
 SynthDef(\latooConv, {
 	arg buf = ~ambi, mul = 0.0, abcd = #[1.572, 1.372, 1.429, 1.229],
 	xi = 0.1, yi = 0.1, rate = s.sampleRate/2,
@@ -222,6 +237,35 @@ OSCdef(\shutdown, { |msg|
 
 	~syn_latoo.free;
 }, '/shutdown');
+
+
+OSCdef(\moverCollide, { |msg|
+    // var idA = msg[1].asInteger;
+    // var idB = msg[2].asInteger;
+	var pop = msg[3].asInteger;
+    // var ax = msg[3].asFloat;
+    // var ay = msg[4].asFloat;
+    // var bx = msg[5].asFloat;
+    // var by = msg[6].asFloat;
+    [pop].postln;
+
+    Synth(\tick, [\freq, ~freq*200, \amp, 0.01]);
+    // count = count + 1;
+    // count = count % 2000;
+
+
+}, '/mover/collision');
+
+
+OSCdef(\moverCollideCount, { |msg|
+	var count = msg[1].asInteger;
+
+    // [count].postln;
+
+    ~freq = count;
+
+
+}, '/mover/collision_count');
 
 
 

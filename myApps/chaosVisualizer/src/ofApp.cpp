@@ -72,7 +72,7 @@ void ofApp::setup() {
 
 	// 원의 경계 바깥을 둘러싼 링 형태로 72개의 블랙홀 생성
 	{
-		int numRingBH = 18;
+		int numRingBH = 8;
 		float R_inner = MAIN_CIRCLE_RADIUS; // 메인 원 반지름
 		float ringMargin = 40.0f; // 메인 원보다 얼마나 바깥에 둘 것인지
 		float R_outer = R_inner + ringMargin;
@@ -152,6 +152,11 @@ void ofApp::setup() {
 	gui.add(toggleFieldDots.setup("Field Dots", drawFieldDots));
 	toggleFieldDots.addListener(this, &ofApp::onToggleFieldDots);
 
+	// Initialize collision counting window
+	collisionWindowDuration = 0.1f;
+	collisionWindowTimer = 0.0f;
+	collisionCountInWindow = 0;
+
 	// Init values
 	sendLatooInit();
 	sendLatooAmpState(ampLatoo);
@@ -194,7 +199,6 @@ void ofApp::update() {
 
 	applyBlackholeForce();
 
-
 	// Seed remove
 	for (int i = seeds.size() - 1; i >= 0; --i) {
 		if (seeds[i].update(blackholes, grid, SEED_SIT_THR)) {
@@ -210,10 +214,45 @@ void ofApp::update() {
 		m.bounceOnCircleBoundary(center, R);
 	}
 
+	// mover 개수가 변했을 수 있으니, 충돌 상태 매트릭스를 movers.size() 에 맞게 리사이즈
+	if (moverCollisionState.size() != movers.size()) {
+		moverCollisionState.assign(movers.size(), std::vector<bool>(movers.size(), false));
+	}
+
 	// movers끼리 간단한 충돌 처리 (GUI에서 correctionFactor 조절)
 	for (std::size_t i = 0; i < movers.size(); ++i) {
 		for (std::size_t j = i + 1; j < movers.size(); ++j) {
-			movers[i].collideWith(movers[j], correctionSlider); // -5.0 ~ 5.0 범위
+
+			// 이번 프레임에서의 충돌 여부
+			bool isCollidingNow = movers[i].collideWith(movers[j], correctionSlider);
+
+			// 이전 프레임에서의 충돌 상태
+			bool wasColliding = moverCollisionState[i][j];
+
+			// "충돌 시작" 이벤트: 이전 프레임에는 안 부딪치다가,
+			// 이번 프레임에 처음으로 겹친 경우에만 신호를 보냄
+			if (isCollidingNow && !wasColliding) {
+				collisionCountInWindow++; // 0.1초 윈도우 카운터도 여기서 증가
+				sendMoverCollision(static_cast<int>(i), static_cast<int>(j));
+			}
+
+			// 충돌 상태 업데이트
+			moverCollisionState[i][j] = isCollidingNow;
+		}
+	}
+
+	// 0.1초(window) 동안의 충돌 횟수 집계 및 OSC 전송
+	{
+		float dt = ofGetLastFrameTime(); // 이번 프레임 걸린 시간 (초)
+		collisionWindowTimer += dt;
+
+		if (collisionWindowTimer >= collisionWindowDuration) {
+			// 누적된 충돌 횟수를 OSC로 전송
+			sendCollisionCountWindow(collisionCountInWindow);
+
+			// 윈도우 리셋
+			collisionWindowTimer = 0.0f;
+			collisionCountInWindow = 0;
 		}
 	}
 
@@ -234,7 +273,7 @@ void ofApp::draw() {
 		ofPushStyle();
 		ofSetLineWidth(2.0f);
 
-		int spacing = 20; // 화살표 간격 (픽셀)
+		int spacing = 10; // 화살표 간격 (픽셀)
 		float fieldScale = 900000.0f; // 힘 → 픽셀 길이 스케일
 		float maxLenFactor = 1.0f; // 한 셀 안에서 최대 길이 비율
 
@@ -294,7 +333,7 @@ void ofApp::draw() {
 					// 2) 화살표 끝의 하얀 동그라미는 drawFieldDots 가 true 일 때만
 					if (drawFieldDots) {
 						ofSetColor(255, 255, 255, drawFieldArrows ? 120 : 200);
-						float radius = drawFieldArrows ? 3.5f : 2.0f;
+						float radius = drawFieldArrows ? 3.5f : 1.0f;
 						ofDrawCircle(endPos, radius);
 					}
 				}
@@ -320,18 +359,25 @@ void ofApp::draw() {
 		}
 	}
 
-	for (auto & s : seeds)
+	for (auto & s : seeds) {
 		s.display();
+	}
 
 	if (drawThings) {
-		for (auto & b : blackholes)
+		for (auto & b : blackholes) {
 			b.display();
+		}
 	}
 
 	if (drawAttractor) {
+
+		ofPushStyle(); // ← 추가
+		ofFill(); // 또는 ofNoFill() - 필요에 따라
+		ofSetColor(255, 255, 255, 255); // 완전 불투명 흰색
+
 		renderAttractor();
 
-		// draw AttractorPoint objects
+		// draw AttractorPoint objects - for convergence
 		attractorFbo.begin();
 		ofClear(0, 0, 0, 0);
 
@@ -347,6 +393,8 @@ void ofApp::draw() {
 
 		attractorFbo.end();
 		attractorFbo.draw(0, 0);
+		ofPopStyle();
+
 	}
 
 	// 원형 경계 시각화
@@ -375,6 +423,7 @@ void ofApp::updateParameters() {
 	if (movers.empty() || controllerMoverIndex < 0 || controllerMoverIndex >= (int)movers.size()) {
 		return; // 아직 컨트롤러가 없으면 파라미터를 갱신하지 않음
 	}
+
 	const Mover & controller = movers[controllerMoverIndex];
 
 	lat_a = ofMap(controller.pos.x, 0, width, 0.2, 3.0);
@@ -441,11 +490,13 @@ void ofApp::applyBlackholeForce() {
 void ofApp::renderAttractor() {
 
 	attractorLayer.begin();
+	ofPushStyle();
 	ofClear(0, 0, 0, 0);
 	ofPushMatrix();
 	ofTranslate(width / 2, height / 2);
 	ofSetLineWidth(1.5);
 	ofSetColor(255);
+	ofFill();
 
 	float x = lat_x, y = lat_y;
 	float prevX = 0, prevY = 0;
@@ -472,6 +523,7 @@ void ofApp::renderAttractor() {
 	}
 
 	ofPopMatrix();
+	ofPopStyle();
 	attractorLayer.end();
 	attractorLayer.draw(0, 0);
 }
@@ -610,7 +662,6 @@ void ofApp::onToggleChanged(bool & val) {
 
 void ofApp::onToggleDrawThings(bool & val) {
 	drawThings = val;
-	ofLog() << drawThings;
 }
 
 void ofApp::onToggleFieldArrows(bool & val) {
@@ -808,6 +859,33 @@ void ofApp::sendSeedVelocity() {
 		msg.addFloatArg(seed.vel.y);
 		sender.sendMessage(msg, false);
 	}
+}
+
+void ofApp::sendMoverCollision(int idxA, int idxB) {
+	if (idxA < 0 || idxB < 0 || idxA >= (int)movers.size() || idxB >= (int)movers.size()) {
+		return;
+	}
+
+	ofxOscMessage msg;
+	msg.setAddress("/mover/collision");
+	msg.addIntArg(idxA);
+	msg.addIntArg(idxB);
+
+	// 현재 mover 개수 추가
+	msg.addIntArg(static_cast<int>(movers.size()));
+
+	msg.addFloatArg(movers[idxA].pos.x);
+	msg.addFloatArg(movers[idxA].pos.y);
+	msg.addFloatArg(movers[idxB].pos.x);
+	msg.addFloatArg(movers[idxB].pos.y);
+	sender.sendMessage(msg, false);
+}
+
+void ofApp::sendCollisionCountWindow(int count) {
+	ofxOscMessage msg;
+	msg.setAddress("/mover/collision_count");
+	msg.addIntArg(count); // 0.1초 동안 발생한 충돌 횟수
+	sender.sendMessage(msg, false);
 }
 
 void ofApp::removeSeedAt(int index) {

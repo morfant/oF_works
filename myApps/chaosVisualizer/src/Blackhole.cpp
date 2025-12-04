@@ -9,6 +9,8 @@ Blackhole::Blackhole(float x, float y, int id)
 
 void Blackhole::display() {
 
+	ofPushStyle();
+
 	// strength 값으로 반지름 결정하고 그리는 부분 (예시)
 	float sAbs       = fabs(strength);
 	float sClamped = ofClamp(sAbs, 0.0f, 10.0f);
@@ -37,6 +39,8 @@ void Blackhole::display() {
 	ofDrawBitmapString(strengthLabel,
 		pos.x - 20,
 		pos.y + 14); // y를 약간 내려서 id 아래에
+
+	ofPopStyle();
 }
 
 void Blackhole::moveTo(float mx, float my) {

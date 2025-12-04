@@ -55,6 +55,8 @@ public:
 	void sendShutdown();
 	void sendSeedPositions();
 	void sendSeedVelocity();
+	void sendMoverCollision(int idxA, int idxB);
+	void sendCollisionCountWindow(int count); // ★ 추가
 	void removeSeedAt(int index);
 	void oscReceive();
 
@@ -65,7 +67,6 @@ public:
 	// void onSliderChanged(int& value);
 
 	void exit();
-
 
 	int width, height;
 
@@ -117,4 +118,13 @@ public:
 
 	vector<AttractorPoint> attractorPoints;
 	ofFbo attractorFbo;
+
+	// Collision counting over time window
+	float collisionWindowDuration = 0.1f; // 0.1초 윈도우
+	float collisionWindowTimer = 0.0f; // dt 누적
+	int collisionCountInWindow = 0; // 이 윈도우 동안 충돌 횟수
+
+	// mover 간 충돌 상태를 기억하기 위한 2D 매트릭스
+	// moverCollisionState[i][j] == true 이면, 이전 프레임에서 i,j 가 이미 충돌 중이었다는 의미
+	std::vector<std::vector<bool>> moverCollisionState;
 };
