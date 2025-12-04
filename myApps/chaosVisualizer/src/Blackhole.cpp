@@ -10,19 +10,24 @@ Blackhole::Blackhole(float x, float y, int id)
 void Blackhole::display() {
 
 	// strength 값으로 반지름 결정하고 그리는 부분 (예시)
-	float sClamped = ofClamp(strength, 0.0f, 10.0f);
+	float sAbs       = fabs(strength);
+	float sClamped = ofClamp(sAbs, 0.0f, 10.0f);
 	float baseRadius = 4.0f;
 	float maxRadius = 22.0f;
 	float r = ofMap(sClamped, 0.0f, 10.0f, baseRadius, maxRadius, true);
 
-	ofSetColor(255, 120, 120, 200);
+	if (strength < 0) {
+		ofSetColor(120, 100, 255, 200); // repulsive
+	} else {
+		ofSetColor(255, 120, 120, 200); // attractive
+	}
 	ofFill();
 	ofDrawCircle(pos, r);
 
-	ofNoFill();
-	ofSetColor(255, 60, 60, 220);
-	ofSetLineWidth(1.8f);
-	ofDrawCircle(pos, r + 2.0f);
+	// ofNoFill();
+	// ofSetColor(255, 60, 60, 220);
+	// ofSetLineWidth(1.8f);
+	// ofDrawCircle(pos, r + 2.0f);
 
 	ofSetColor(255);
 	ofDrawBitmapString("#" + ofToString(id), pos.x - 10, pos.y);

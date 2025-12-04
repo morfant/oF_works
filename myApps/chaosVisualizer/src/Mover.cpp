@@ -115,7 +115,7 @@ void Mover::update() {
     vel.limit(Mover::VEL_LIMIT);
     pos += vel;
     acc.set(0, 0);
-    checkEdges(false);
+    // checkEdges(false);
 }
 
 void Mover::draw(bool dot) {

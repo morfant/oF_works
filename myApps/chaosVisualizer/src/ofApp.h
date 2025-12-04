@@ -40,6 +40,8 @@ public:
 	void onConvergeChanged(float & val);
 	void onStrengthRangeScaleChanged(float & val);
 	void onForceBaseScaleChanged(float & val);
+	void onTimeScaleChanged(float & val);
+	void onIndexScaleChanged(float & val);
 	void onToggleChanged(bool & val);
 	void onToggleDrawThings(bool & val);
 	void onToggleFieldArrows(bool & val); // 콜백 선언
@@ -64,6 +66,9 @@ public:
 
 	void exit();
 
+
+	int width, height;
+
 	bool drawThings, ampLatoo, useLines;
 	bool isDragging, overToggle, overSlider;
 	bool drawFieldArrows; // 화살표를 그릴지 여부
@@ -77,6 +82,8 @@ public:
 	float seedMass;
 	float strengthRangeScale; // 1st stage: Perlin 기반 strength 범위 스케일
 	float forceBaseScale; // 2nd stage: 거리 기반 1/r^2 기본 힘 스케일
+	float timeScale; // Perlin 시간 흐름 속도
+	float indexScale; // 링을 따라 패턴 변화 속도
 
 	Mover mover; // 원래 있던 메인 Mover
 	std::vector<Mover> movers; // 키로 추가/삭제하는 extra Mover들
@@ -96,6 +103,8 @@ public:
 	ofxIntSlider iSlider; // Int 타입 슬라이더
 	ofxFloatSlider strengthRangeScaleSlider;
 	ofxFloatSlider forceBaseScaleSlider;
+	ofxFloatSlider timeScaleSlider;
+	ofxFloatSlider indexScaleSlider;
 	ofxToggle toggle;
 	ofxToggle toggleDraw;
 	ofxToggle toggleFieldArrows; // force-field 화살표 표시 토글

@@ -1,7 +1,7 @@
 // ofApp.cpp
 #include "ofApp.h"
 
-static const float MAIN_CIRCLE_RADIUS = 460.0f; // 기존 220.0f 에서 확장된 원 경계 반지름
+static const float MAIN_CIRCLE_RADIUS = 400.0f; // 기존 220.0f 에서 확장된 원 경계 반지름
 
 //--------------------------------------------------------------
 void ofApp::setup() {
@@ -29,7 +29,7 @@ void ofApp::setup() {
 
 	attractorLayer.allocate(width, height, GL_RGBA);
 
-	attractorFbo.allocate(ofGetWidth(), ofGetHeight(), GL_RGBA);
+	attractorFbo.allocate(width, height, GL_RGBA);
 	attractorFbo.begin();
 	ofClear(0, 0, 0, 0);
 	attractorFbo.end();
@@ -113,15 +113,22 @@ void ofApp::setup() {
 	strengthRangeScale = 1.0f;
 	gui.add(strengthRangeScaleSlider.setup("Strength Range Scale",
 		strengthRangeScale,
-		0.1f, 5.0f));
+		-5.0f, 5.0f));
 	strengthRangeScaleSlider.addListener(this, &ofApp::onStrengthRangeScaleChanged);
 
 	// 2nd stage: base (1/r^2) force scaling
 	forceBaseScale = 1.0f;
 	gui.add(forceBaseScaleSlider.setup("Force Base Scale",
 		forceBaseScale,
-		0.1f, 5.0f));
+		-5.0f, 5.0f));
 	forceBaseScaleSlider.addListener(this, &ofApp::onForceBaseScaleChanged);
+
+	timeScale = 0.03f;
+	indexScale = 0.05f;
+	gui.add(timeScaleSlider.setup("Time Scale", timeScale, 0.0f, 0.5f));
+	gui.add(indexScaleSlider.setup("Index Scale", indexScale, 0.0f, 0.5f));
+	timeScaleSlider.addListener(this, &ofApp::onTimeScaleChanged);
+	indexScaleSlider.addListener(this, &ofApp::onIndexScaleChanged);
 
 	gui.add(toggle.setup("Amp On", ampLatoo));
 	toggle.addListener(this, &ofApp::onToggleChanged);
@@ -164,27 +171,29 @@ void ofApp::update() {
 	}
 
 	// Perlin 노이즈로 각 블랙홀 strength 갱신
+	// 하나의 노이즈 값 n(0..1)을 [-maxAbsStrength, +maxAbsStrength] 로 매핑해서
+	// 크기와 부호가 함께 변하도록 한다.
 	{
 		float t = ofGetElapsedTimef();
 
-		float timeScale = 0.15f; // 시간이 흐르는 속도
-		float indexScale = 0.05f; // 링을 따라 strength 패턴이 얼마나 빨리 변하는지
-		float minStrength = 0.2f; // 최소 인력
-		float maxStrength = 10.0f; // 최대 인력
+		float maxAbsStrength = 100.0f; // |strength| 의 최대값
+
+		// 슬라이더에서 1차 스케일 값 읽기
+		strengthRangeScale = strengthRangeScaleSlider;
 
 		for (int i = 0; i < (int)blackholes.size(); ++i) {
-			float n = ofNoise(t * timeScale, i * indexScale);
-			float baseStrength = ofMap(n, 0.0f, 1.0f, minStrength, maxStrength);
-			blackholes[i].strength = baseStrength * strengthRangeScale; // 1차 글로벌 스케일
+			float n = ofNoise(t * timeScale, i * indexScale); // 0..1
+
+			// 0..1 -> [-maxAbsStrength, +maxAbsStrength]
+			float signedStrength = ofMap(n, 0.0f, 1.0f,
+				-maxAbsStrength, maxAbsStrength);
+
+			blackholes[i].strength = signedStrength * strengthRangeScale;
 		}
 	}
+
 	applyBlackholeForce();
 
-	// for (auto & b : blackholes) {
-	// 	if (mover.isCollidingWith(b)) {
-	// 		mover.warp();
-	// 	}
-	// }
 
 	// Seed remove
 	for (int i = seeds.size() - 1; i >= 0; --i) {
@@ -194,7 +203,7 @@ void ofApp::update() {
 	}
 
 	// 원형 경계 안에서 Mover / movers 튕기기
-	ofVec2f center(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f);
+	ofVec2f center(width / 2.0f, height / 2.0f);
 	float R = MAIN_CIRCLE_RADIUS; // 메인 원 반지름
 	for (auto & m : movers) {
 		m.update();
@@ -239,6 +248,10 @@ void ofApp::draw() {
 				for (auto & b : blackholes) {
 					ofVec2f dir = b.pos - pos;
 					float distSq = dir.lengthSquared();
+					float minDist = 1.0f; // 최소 거리
+					if (distSq < minDist * minDist) {
+						distSq = minDist * minDist;
+					}
 					if (distSq > 0.0001f) { // 0 나누기 방지
 						dir.normalize();
 						float base = (10.0f * forceBaseScale) / distSq; // 1/r^2 기본 힘에 글로벌 스케일 적용
@@ -323,7 +336,7 @@ void ofApp::draw() {
 		ofClear(0, 0, 0, 0);
 
 		ofPushMatrix();
-		ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
+		ofTranslate(width / 2, height / 2);
 		ofSetColor(255);
 
 		for (auto & pt : attractorPoints) {
@@ -342,12 +355,17 @@ void ofApp::draw() {
 	ofSetColor(180);
 	ofSetLineWidth(2.0f);
 	float R = MAIN_CIRCLE_RADIUS;
-	ofDrawCircle(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f, R);
+	ofDrawCircle(width / 2.0f, height / 2.0f, R);
 	ofPopStyle();
 	// check for the data from the image
 	// drawTargetPositions(attractorPoints);
 
 	drawUI();
+
+	ofSetColor(0, 255, 0);
+	ofDrawCircle(width / 2.0f, height / 2.0f, 5); // 블랙홀 링 기준 중심
+	ofSetColor(255, 0, 0);
+	ofDrawCircle(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f, 3); // 현재 창 기준 중심
 
 	// ofLog() << "draw is done!";
 }
@@ -402,9 +420,11 @@ void ofApp::applyBlackholeForce() {
 		for (auto & b : blackholes) {
 
 			ofVec2f dir = b.pos - m.pos;
-			// ofVec2f dir = m.pos - b.pos; // repulsive: 블랙홀에서 밀어내는 방향
-			
 			float distSq = dir.lengthSquared();
+			float minDist = 1.0f; // 최소 거리
+			if (distSq < minDist * minDist) {
+				distSq = minDist * minDist;
+			}
 			if (distSq > 0.0001f) { // 0 나누기 방지
 				dir.normalize();
 				// 기본 1/r^2 에 각 블랙홀의 strength 를 곱해줌
@@ -423,7 +443,7 @@ void ofApp::renderAttractor() {
 	attractorLayer.begin();
 	ofClear(0, 0, 0, 0);
 	ofPushMatrix();
-	ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2);
+	ofTranslate(width / 2, height / 2);
 	ofSetLineWidth(1.5);
 	ofSetColor(255);
 
@@ -434,8 +454,8 @@ void ofApp::renderAttractor() {
 	for (int i = 0; i < ATTR_ITER_NUM; ++i) {
 		float nextX = sin(lat_b * y) + lat_c * sin(lat_b * x);
 		float nextY = sin(lat_a * x) + lat_d * sin(lat_a * y);
-		float px = ofMap(nextX, -2, 2, -ofGetWidth() / 2, ofGetWidth() / 2);
-		float py = ofMap(nextY, -2, 2, -ofGetHeight() / 2, ofGetHeight() / 2);
+		float px = ofMap(nextX, -2, 2, -width / 2, width / 2);
+		float py = ofMap(nextY, -2, 2, -height / 2, height / 2);
 
 		if (useLines) {
 			if (!isFirst) ofDrawLine(prevX, prevY, px, py);
@@ -512,12 +532,12 @@ void ofApp::assignTargetPositionsFromImage(const ofImage & img,
 
 void ofApp::drawTargetPositions(const std::vector<AttractorPoint> & points) {
 	ofPushMatrix();
-	ofTranslate(ofGetWidth() / 2, ofGetHeight() / 2); // 중심 기준으로
+	ofTranslate(width / 2, height / 2); // 중심 기준으로
 
 	ofSetColor(255, 0, 0, 100); // 빨간색, 투명도 약간
 	for (const auto & pt : points) {
-		float x = ofMap(pt.targetPos.x, -1, 1, -ofGetWidth() / 2, ofGetWidth() / 2);
-		float y = ofMap(pt.targetPos.y, -1, 1, -ofGetHeight() / 2, ofGetHeight() / 2);
+		float x = ofMap(pt.targetPos.x, -1, 1, -width / 2, width / 2);
+		float y = ofMap(pt.targetPos.y, -1, 1, -height / 2, height / 2);
 		ofDrawCircle(x, y, 2); // 작고 연한 점
 	}
 
@@ -566,6 +586,14 @@ void ofApp::onStrengthRangeScaleChanged(float & val) {
 
 void ofApp::onForceBaseScaleChanged(float & val) {
 	forceBaseScale = val;
+}
+
+void ofApp::onTimeScaleChanged(float & val) {
+	timeScale = val;
+}
+
+void ofApp::onIndexScaleChanged(float & val) {
+	indexScale = val;
 }
 
 void ofApp::onToggleChanged(bool & val) {
@@ -653,9 +681,9 @@ void ofApp::keyPressed(int key) {
 
 	// 'c' 키: 새로운 Mover 추가
 	if (key == 'c') {
-		ofVec2f center(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f);
+		ofVec2f center(width / 2.0f, height / 2.0f);
 		float R = MAIN_CIRCLE_RADIUS;
-		Mover m(ofGetWidth() / 2, ofGetHeight() / 2, 5);
+		Mover m(width / 2, height / 2, 5);
 		// 원 내부의 랜덤 위치로 이동
 		float angle = ofRandom(TWO_PI);
 		float rad = ofRandom(R);
