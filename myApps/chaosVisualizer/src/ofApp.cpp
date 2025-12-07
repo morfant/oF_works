@@ -26,6 +26,7 @@ void ofApp::setup() {
 	seedMass = 0.1f;
 	useLines = false;
 	drawThings = true;
+	drawMainCircle = true;
 
 	attractorLayer.allocate(width, height, GL_RGBA);
 
@@ -72,7 +73,7 @@ void ofApp::setup() {
 
 	// 원의 경계 바깥을 둘러싼 링 형태로 72개의 블랙홀 생성
 	{
-		int numRingBH = 8;
+		int numRingBH = 32;
 		float R_inner = MAIN_CIRCLE_RADIUS; // 메인 원 반지름
 		float ringMargin = 40.0f; // 메인 원보다 얼마나 바깥에 둘 것인지
 		float R_outer = R_inner + ringMargin;
@@ -151,6 +152,10 @@ void ofApp::setup() {
 	drawFieldDots = false;
 	gui.add(toggleFieldDots.setup("Field Dots", drawFieldDots));
 	toggleFieldDots.addListener(this, &ofApp::onToggleFieldDots);
+
+	// 중앙 메인 원 그리기 토글
+	gui.add(toggleMainCircle.setup("Main Circle", drawMainCircle));
+	toggleMainCircle.addListener(this, &ofApp::onToggleMainCircle);
 
 	// Initialize collision counting window
 	collisionWindowDuration = 0.1f;
@@ -271,11 +276,11 @@ void ofApp::draw() {
 	// --- 모든 블랙홀들의 합력 방향을 시각화: 화면 전체에 화살표 필드 ---
 	{
 		ofPushStyle();
-		ofSetLineWidth(2.0f);
+		ofSetLineWidth(4.0f);
 
 		int spacing = 10; // 화살표 간격 (픽셀)
 		float fieldScale = 900000.0f; // 힘 → 픽셀 길이 스케일
-		float maxLenFactor = 1.0f; // 한 셀 안에서 최대 길이 비율
+		float maxLenFactor = 4.0f; // 한 셀 안에서 최대 길이 비율
 
 		for (int gy = spacing / 2; gy < height; gy += spacing) {
 			for (int gx = spacing / 2; gx < width; gx += spacing) {
@@ -322,18 +327,20 @@ void ofApp::draw() {
 						ofDrawLine(pos, endPos);
 
 						// 화살표 머리
-						float headSize = 6.0f;
-						ofVec2f perp(-dirNorm.y, dirNorm.x);
-						ofVec2f tip = endPos;
-						ofVec2f left = endPos - dirNorm * headSize + perp * (headSize * 0.5f);
-						ofVec2f right = endPos - dirNorm * headSize - perp * (headSize * 0.5f);
-						ofDrawTriangle(tip, left, right);
+						// float headSize = 6.0f;
+						// ofVec2f perp(-dirNorm.y, dirNorm.x);
+						// ofVec2f tip = endPos;
+						// ofVec2f left = endPos - dirNorm * headSize + perp * (headSize * 0.5f);
+						// ofVec2f right = endPos - dirNorm * headSize - perp * (headSize * 0.5f);
+						// ofDrawTriangle(tip, left, right);
 					}
 
 					// 2) 화살표 끝의 하얀 동그라미는 drawFieldDots 가 true 일 때만
 					if (drawFieldDots) {
-						ofSetColor(255, 255, 255, drawFieldArrows ? 120 : 200);
-						float radius = drawFieldArrows ? 3.5f : 1.0f;
+						// ofSetColor(255, 255, 255, drawFieldArrows ? 120 : 200);
+						ofSetColor(255, 255, 255, 120);
+						// float radius = drawFieldArrows ? 3.5f : 1.0f;
+						float radius = 7.f;
 						ofDrawCircle(endPos, radius);
 					}
 				}
@@ -398,13 +405,15 @@ void ofApp::draw() {
 	}
 
 	// 원형 경계 시각화
-	ofPushStyle();
-	ofNoFill();
-	ofSetColor(180);
-	ofSetLineWidth(2.0f);
-	float R = MAIN_CIRCLE_RADIUS;
-	ofDrawCircle(width / 2.0f, height / 2.0f, R);
-	ofPopStyle();
+	if (drawMainCircle) {
+		ofPushStyle();
+		ofNoFill();
+		ofSetColor(180);
+		ofSetLineWidth(2.0f);
+		float R = MAIN_CIRCLE_RADIUS;
+		ofDrawCircle(width / 2.0f, height / 2.0f, R);
+		ofPopStyle();
+	}
 	// check for the data from the image
 	// drawTargetPositions(attractorPoints);
 
@@ -674,6 +683,10 @@ void ofApp::onToggleFieldDots(bool & val) {
 
 void ofApp::onToggleAttractor(bool & val) {
 	drawAttractor = val;
+}
+
+void ofApp::onToggleMainCircle(bool & val) {
+	drawMainCircle = val;
 }
 
 //--------------------------------------------------------------

@@ -47,6 +47,7 @@ public:
 	void onToggleFieldArrows(bool & val); // 콜백 선언
 	void onToggleFieldDots(bool & val); // 콜백 선언
 	void onToggleAttractor(bool & val);
+	void onToggleMainCircle(bool & val);
 
 	void sendLatooParams();
 	void sendLatooInit();
@@ -75,6 +76,7 @@ public:
 	bool drawFieldArrows; // 화살표를 그릴지 여부
 	bool drawFieldDots;
 	bool drawAttractor; // attractor를 그릴지 여부
+	bool drawMainCircle; // 화면 중앙 메인 원 표시 여부
 	Blackhole * draggingBlackhole = nullptr;
 
 	float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
@@ -111,6 +113,7 @@ public:
 	ofxToggle toggleFieldArrows; // force-field 화살표 표시 토글
 	ofxToggle toggleFieldDots; // force-field 화살표 표시 토글
 	ofxToggle toggleAttractor; // Latoocarfian attractor 그리기 토글
+	ofxToggle toggleMainCircle; // 메인 원 표시 토글
 
 	// OSC
 	ofxOscSender sender;
