@@ -201,6 +201,8 @@ void ofApp::update() {
 			blackholes[i].strength = signedStrength * strengthRangeScale;
 		}
 	}
+	// 블랙홀 상태를 OSC로 전송
+	sendBlackholeStates();
 
 	applyBlackholeForce();
 
@@ -875,6 +877,34 @@ void ofApp::sendSeedVelocity() {
 		msg.addIntArg(seed.id);
 		msg.addFloatArg(seed.vel.x);
 		msg.addFloatArg(seed.vel.y);
+		sender.sendMessage(msg, false);
+	}
+}
+
+void ofApp::sendBlackholeStates() {
+	// 각 블랙홀의 상태(id, 위치, 인력/척력 크기)를 OSC로 전송
+	for (const auto & b : blackholes) {
+		ofxOscMessage msg;
+		msg.setAddress("/blackhole/state");
+
+		// 1) 블랙홀 고유 id
+		msg.addIntArg(b.id);
+
+		// 2) 인력/척력 값 (부호 포함: + = 인력, - = 척력)
+		msg.addFloatArg(b.strength);
+
+		// 3) 순수 크기(절대값)
+		// float magnitude = std::abs(b.strength);
+		// msg.addFloatArg(magnitude);
+
+		// 4) 모드: 1 = attraction(인력), -1 = repulsion(척력)
+		int mode = (b.strength >= 0.0f) ? 1 : -1;
+		msg.addIntArg(mode);
+
+		// 5) 화면상의 위치 (옵션: SC에서 위치 기반 매핑하고 싶을 때)
+		msg.addFloatArg(b.pos.x);
+		msg.addFloatArg(b.pos.y);
+
 		sender.sendMessage(msg, false);
 	}
 }

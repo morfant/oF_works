@@ -56,6 +56,7 @@ public:
 	void sendShutdown();
 	void sendSeedPositions();
 	void sendSeedVelocity();
+	void sendBlackholeStates();   // ← 이 줄 추가
 	void sendMoverCollision(int idxA, int idxB);
 	void sendCollisionCountWindow(int count); // ★ 추가
 	void removeSeedAt(int index);

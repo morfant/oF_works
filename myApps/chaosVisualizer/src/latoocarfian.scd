@@ -10,10 +10,36 @@
 a =Synth(\latooConv, [\buf, ~ambi])
 
 Synth(\tick)
+a = Synth(\blackholeVoice)
 
 (
-// Synthdef
 var count = 0;
+
+// Synthdef
+SynthDef(\blackholeVoice, { |out=0, id=0, strength=0, mode=1, pan=0|
+    var mag, freqBase, freq, tone, noisy, sig, env;
+
+    // 크기 -> 0..1 로 정규화 (strength 범위에 맞게 숫자 조절)
+    mag = strength.abs.clip(0, 400).linlin(0, 400, 0, 1);
+
+    // 각 블랙홀마다 기본 주파수 다르게 (id 로 분산)
+    freqBase = (48 + id).midicps;   // 80, 120, 160... 이런 식
+    freq = freqBase * (1 + (mag * 4)); // 세기가 커질수록 더 높은 음
+
+    // attraction: 부드러운 톤, repulsion: 거친 노이즈
+    tone  = SinOsc.ar(freq) * (mag.linexp(0, 1, -30.dbamp, -10.dbamp));
+    noisy = BPF.ar(WhiteNoise.ar, freq * 2, 0.2) * (mag * 0.4);
+
+    // mode > 0 이면 tone 쪽, mode < 0 이면 noisy 쪽으로 보간
+    sig = SelectX.ar(mode > 0, [noisy, tone]);
+
+    // 패닝: x 좌표를 -1..1 로 매핑해서 넣을 예정
+    sig = Pan2.ar(sig, pan, 1);
+
+    Out.ar(out, sig);
+}).add;
+
+
 SynthDef(\tick, {
     |freq = 100, pan = 0, gate = 1, amp = 0.001|
 
@@ -268,6 +294,40 @@ OSCdef(\moverCollideCount, { |msg|
 }, '/mover/collision_count');
 
 
+
+// id -> Synth 를 보관하는 딕셔너리
+~bhSynths = IdentityDictionary.new;
+
+OSCdef(\bhState, { |msg, time, addr, port|
+    var id, strength, mode, x, y, pan;
+    // oF 쪽에서 보낸 순서:
+    // [addr, id, strength, mode, x, y]
+    id       = msg[1].asInteger;
+    strength = msg[2].asFloat;
+    mode     = msg[3].asInteger;
+    x        = msg[4].asFloat;
+    y        = msg[5].asFloat;
+
+    // 화면 폭을 알고 있다면 그 값으로 매핑 (예: 1920 기준)
+    pan = x.linlin(0, 1920, -1, 1).clip(-1, 1);
+
+    // 아직 없는 id면 새로 만들고, 있으면 값만 업데이트
+    ~bhSynths[id] ?? {
+        ~bhSynths[id] = Synth(\blackholeVoice, [
+            \id, id,
+            \strength, strength,
+            \mode, mode,
+            \pan, pan
+        ]);
+    } !? { |syn|
+        syn.set(
+            \strength, strength,
+            \mode, mode,
+            \pan, pan
+        );
+    };
+}, "/blackhole/state");
+)
 
 /* SEND */
 ~pr = NetAddr("localhost", 12000);
