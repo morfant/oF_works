@@ -25,8 +25,15 @@ void ofApp::setup() {
 	ampLatoo = false;
 	seedMass = 0.1f;
 	useLines = false;
-	drawThings = true;
-	drawMainCircle = true;
+	drawThings = false;
+	drawMainCircle = false;
+	strengthRangeScale = 1.0f;
+	forceBaseScale = 1.0f;
+	timeScale = 0.03f;
+	indexScale = 0.05f;
+	drawAttractor = true;
+	drawFieldArrows = true;
+	drawFieldDots = true;
 
 	attractorLayer.allocate(width, height, GL_RGBA);
 
@@ -111,21 +118,17 @@ void ofApp::setup() {
 
 	// --- Global blackhole force controls ---
 	// 1st stage: overall strength range scaling (Perlin output)
-	strengthRangeScale = 1.0f;
 	gui.add(strengthRangeScaleSlider.setup("Strength Range Scale",
 		strengthRangeScale,
 		-5.0f, 5.0f));
 	strengthRangeScaleSlider.addListener(this, &ofApp::onStrengthRangeScaleChanged);
 
 	// 2nd stage: base (1/r^2) force scaling
-	forceBaseScale = 1.0f;
 	gui.add(forceBaseScaleSlider.setup("Force Base Scale",
 		forceBaseScale,
 		-5.0f, 5.0f));
 	forceBaseScaleSlider.addListener(this, &ofApp::onForceBaseScaleChanged);
 
-	timeScale = 0.03f;
-	indexScale = 0.05f;
 	gui.add(timeScaleSlider.setup("Time Scale", timeScale, 0.0f, 0.5f));
 	gui.add(indexScaleSlider.setup("Index Scale", indexScale, 0.0f, 0.5f));
 	timeScaleSlider.addListener(this, &ofApp::onTimeScaleChanged);
@@ -139,17 +142,14 @@ void ofApp::setup() {
 	toggleDraw.addListener(this, &ofApp::onToggleDrawThings);
 
 	// Latoocarfian attractor(배경) 그리기 토글
-	drawAttractor = false;
 	gui.add(toggleAttractor.setup("Draw Attractor", drawAttractor));
 	toggleAttractor.addListener(this, &ofApp::onToggleAttractor);
 
 	// Toggle for drawing the force-field arrows
-	drawFieldArrows = true;
 	gui.add(toggleFieldArrows.setup("Field Arrows", drawFieldArrows));
 	toggleFieldArrows.addListener(this, &ofApp::onToggleFieldArrows);
 
 	// Toggle for drawing the field dots at arrow tips
-	drawFieldDots = false;
 	gui.add(toggleFieldDots.setup("Field Dots", drawFieldDots));
 	toggleFieldDots.addListener(this, &ofApp::onToggleFieldDots);
 
@@ -273,6 +273,27 @@ void ofApp::draw() {
 
 	// grid.display(0);
 
+	for (std::size_t i = 0; i < movers.size(); ++i) {
+		auto & m = movers[i];
+		m.draw(true);
+
+		// 컨트롤러 Mover 인 경우 노란색 원으로 강조 표시
+		// if ((int)i == controllerMoverIndex) {
+		// 	ofPushStyle();
+		// 	ofNoFill();
+		// 	ofSetColor(255, 255, 0);
+		// 	ofSetLineWidth(2.0f);
+		// 	float highlightRadius = m.diameter * 0.5f + 4.0f; // 본체보다 약간 크게
+		// 	ofDrawCircle(m.pos, highlightRadius);
+		// 	ofPopStyle();
+		// }
+	}
+
+	for (auto & s : seeds) {
+		s.display();
+	}
+
+
 	// --- 모든 블랙홀들의 합력 방향을 시각화: 화면 전체에 화살표 필드 ---
 	{
 		ofPushStyle();
@@ -335,6 +356,7 @@ void ofApp::draw() {
 						// ofDrawTriangle(tip, left, right);
 					}
 
+
 					// 2) 화살표 끝의 하얀 동그라미는 drawFieldDots 가 true 일 때만
 					if (drawFieldDots) {
 						// ofSetColor(255, 255, 255, drawFieldArrows ? 120 : 200);
@@ -350,25 +372,7 @@ void ofApp::draw() {
 		ofPopStyle();
 	}
 
-	for (std::size_t i = 0; i < movers.size(); ++i) {
-		auto & m = movers[i];
-		m.draw(false);
 
-		// 컨트롤러 Mover 인 경우 노란색 원으로 강조 표시
-		if ((int)i == controllerMoverIndex) {
-			ofPushStyle();
-			ofNoFill();
-			ofSetColor(255, 255, 0);
-			ofSetLineWidth(2.0f);
-			float highlightRadius = m.diameter * 0.5f + 4.0f; // 본체보다 약간 크게
-			ofDrawCircle(m.pos, highlightRadius);
-			ofPopStyle();
-		}
-	}
-
-	for (auto & s : seeds) {
-		s.display();
-	}
 
 	if (drawThings) {
 		for (auto & b : blackholes) {
@@ -382,7 +386,7 @@ void ofApp::draw() {
 		ofFill(); // 또는 ofNoFill() - 필요에 따라
 		ofSetColor(255, 255, 255, 255); // 완전 불투명 흰색
 
-		renderAttractor();
+		// renderAttractor();
 
 		// draw AttractorPoint objects - for convergence
 		attractorFbo.begin();
@@ -419,10 +423,11 @@ void ofApp::draw() {
 
 	drawUI();
 
-	ofSetColor(0, 255, 0);
-	ofDrawCircle(width / 2.0f, height / 2.0f, 5); // 블랙홀 링 기준 중심
-	ofSetColor(255, 0, 0);
-	ofDrawCircle(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f, 3); // 현재 창 기준 중심
+	// Draw center point
+	// ofSetColor(0, 255, 0);
+	// ofDrawCircle(width / 2.0f, height / 2.0f, 5); // 블랙홀 링 기준 중심
+	// ofSetColor(255, 0, 0);
+	// ofDrawCircle(ofGetWidth() / 2.0f, ofGetHeight() / 2.0f, 3); // 현재 창 기준 중심
 
 	// ofLog() << "draw is done!";
 }

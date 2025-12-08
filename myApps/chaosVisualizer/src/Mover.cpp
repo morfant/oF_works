@@ -6,7 +6,7 @@
 
 Mover::Mover(float x, float y, float m)
     : pos(x, y), vel(ofRandom(-1, 1), ofRandom(-1, 1)), acc(0, 0), diameter(40), mass(m) {}
-
+            
 void Mover::applyForce(const ofVec2f& force) {
     acc += force / mass;
 }
@@ -137,7 +137,7 @@ void Mover::draw(bool dot) {
     else
     {
         ofSetColor(255, 200, 10);
-        ofDrawCircle(pos, diameter * 0.05);
+        ofDrawCircle(pos, diameter * 0.5);
     }
 
 }
