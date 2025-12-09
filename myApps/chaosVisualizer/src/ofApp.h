@@ -92,6 +92,7 @@ public:
 	float timeScale; // Perlin 시간 흐름 속도
 	float indexScale; // 링을 따라 패턴 변화 속도
 	float fieldScale;
+	float firstMoverAge = 0.0f;   // 첫번째 mover의 나이(초 단위)
 
 	Mover mover; // 원래 있던 메인 Mover
 	std::vector<Mover> movers; // 키로 추가/삭제하는 extra Mover들
@@ -121,6 +122,7 @@ public:
 	ofxToggle toggleAttractor; // Latoocarfian attractor 그리기 토글
 	ofxToggle toggleMainCircle; // 메인 원 표시 토글
 	ofxToggle toggleFieldClip;
+	ofxLabel ageLabel;
 
 	// OSC
 	ofxOscSender sender;

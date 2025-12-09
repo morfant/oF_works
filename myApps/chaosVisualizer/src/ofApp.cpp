@@ -164,6 +164,8 @@ void ofApp::setup() {
 	gui.add(toggleFieldClip.setup("Clip Field to Circle", clipFieldToCircle));
 	toggleFieldClip.addListener(this, &ofApp::onToggleFieldClip);
 
+	gui.add(ageLabel.setup("Mover Age", "0.0"));
+
 	// Initialize collision counting window
 	collisionWindowDuration = 0.1f;
 	collisionWindowTimer = 0.0f;
@@ -268,6 +270,25 @@ void ofApp::update() {
 			collisionWindowTimer = 0.0f;
 			collisionCountInWindow = 0;
 		}
+	}
+
+	// ---- 첫 번째 mover의 나이 → lat_rate로 사용 ----
+	if (!movers.empty() && controllerMoverIndex >= 0) {
+
+		float dt = ofGetLastFrameTime(); // 이번 프레임 경과 시간(초)
+		firstMoverAge += dt; // 나이 누적 (초 단위)
+		ageLabel = ofToString(firstMoverAge, 2);   // 소수점 2자리 표시
+
+		// 예: 나이(초)를 LAT_RATE로 단순 스케일링
+		//  - 0초일 때 10
+		//  - 480초 이상이 되면 48000에서 포화
+		float rateF = firstMoverAge * 100.0f; // 초 → 대략 100배 스케일
+		rateF = ofClamp(rateF, 10.0f, 48000.0f); // 슬라이더 범위와 맞춤
+
+		lat_rate = static_cast<int>(firstMoverAge);
+
+		// 매 프레임(혹은 더 느리게 하고 싶으면 조건 추가) SC로 전송
+		sendLatooRate();
 	}
 
 	// OSC
@@ -677,7 +698,7 @@ void ofApp::onIndexScaleChanged(float & val) {
 }
 
 void ofApp::onFieldScaleChanged(float & val) {
-    fieldScale = val;   // 슬라이더 값 → 멤버 변수
+	fieldScale = val; // 슬라이더 값 → 멤버 변수
 }
 
 void ofApp::onToggleChanged(bool & val) {
