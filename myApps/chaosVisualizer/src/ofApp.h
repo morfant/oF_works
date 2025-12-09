@@ -42,12 +42,14 @@ public:
 	void onForceBaseScaleChanged(float & val);
 	void onTimeScaleChanged(float & val);
 	void onIndexScaleChanged(float & val);
+	void onFieldScaleChanged(float & val); // <- 새로 추가
 	void onToggleChanged(bool & val);
 	void onToggleDrawThings(bool & val);
 	void onToggleFieldArrows(bool & val); // 콜백 선언
 	void onToggleFieldDots(bool & val); // 콜백 선언
 	void onToggleAttractor(bool & val);
 	void onToggleMainCircle(bool & val);
+	void onToggleFieldClip(bool & val);
 
 	void sendLatooParams();
 	void sendLatooInit();
@@ -78,6 +80,7 @@ public:
 	bool drawFieldDots;
 	bool drawAttractor; // attractor를 그릴지 여부
 	bool drawMainCircle; // 화면 중앙 메인 원 표시 여부
+	bool clipFieldToCircle;
 	Blackhole * draggingBlackhole = nullptr;
 
 	float lat_x, lat_y, lat_a, lat_b, lat_c, lat_d;
@@ -88,6 +91,7 @@ public:
 	float forceBaseScale; // 2nd stage: 거리 기반 1/r^2 기본 힘 스케일
 	float timeScale; // Perlin 시간 흐름 속도
 	float indexScale; // 링을 따라 패턴 변화 속도
+	float fieldScale;
 
 	Mover mover; // 원래 있던 메인 Mover
 	std::vector<Mover> movers; // 키로 추가/삭제하는 extra Mover들
@@ -109,12 +113,14 @@ public:
 	ofxFloatSlider forceBaseScaleSlider;
 	ofxFloatSlider timeScaleSlider;
 	ofxFloatSlider indexScaleSlider;
+	ofxFloatSlider fieldScaleSlider;  // <- 새로 추가
 	ofxToggle toggle;
 	ofxToggle toggleDraw;
 	ofxToggle toggleFieldArrows; // force-field 화살표 표시 토글
 	ofxToggle toggleFieldDots; // force-field 화살표 표시 토글
 	ofxToggle toggleAttractor; // Latoocarfian attractor 그리기 토글
 	ofxToggle toggleMainCircle; // 메인 원 표시 토글
+	ofxToggle toggleFieldClip;
 
 	// OSC
 	ofxOscSender sender;

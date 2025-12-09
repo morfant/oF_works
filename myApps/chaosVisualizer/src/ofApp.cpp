@@ -31,6 +31,7 @@ void ofApp::setup() {
 	forceBaseScale = 1.0f;
 	timeScale = 0.03f;
 	indexScale = 0.05f;
+	fieldScale = 360.f;
 	drawAttractor = true;
 	drawFieldArrows = true;
 	drawFieldDots = true;
@@ -134,6 +135,9 @@ void ofApp::setup() {
 	timeScaleSlider.addListener(this, &ofApp::onTimeScaleChanged);
 	indexScaleSlider.addListener(this, &ofApp::onIndexScaleChanged);
 
+	gui.add(fieldScaleSlider.setup("Field Scale", fieldScale, 1.0f, 1000.0f));
+	fieldScaleSlider.addListener(this, &ofApp::onFieldScaleChanged);
+
 	gui.add(toggle.setup("Amp On", ampLatoo));
 	toggle.addListener(this, &ofApp::onToggleChanged);
 
@@ -156,6 +160,9 @@ void ofApp::setup() {
 	// 중앙 메인 원 그리기 토글
 	gui.add(toggleMainCircle.setup("Main Circle", drawMainCircle));
 	toggleMainCircle.addListener(this, &ofApp::onToggleMainCircle);
+
+	gui.add(toggleFieldClip.setup("Clip Field to Circle", clipFieldToCircle));
+	toggleFieldClip.addListener(this, &ofApp::onToggleFieldClip);
 
 	// Initialize collision counting window
 	collisionWindowDuration = 0.1f;
@@ -295,20 +302,29 @@ void ofApp::draw() {
 		s.display();
 	}
 
-
 	// --- 모든 블랙홀들의 합력 방향을 시각화: 화면 전체에 화살표 필드 ---
 	{
 		ofPushStyle();
 		ofSetLineWidth(4.0f);
 
 		int spacing = 10; // 화살표 간격 (픽셀)
-		float fieldScale = 900000.0f; // 힘 → 픽셀 길이 스케일
+		ofVec2f center(width * 0.5f, height * 0.5f);
+		float fieldScaleToUse = fieldScale; // 슬라이더로 조절되는 힘 → 픽셀 길이 스케일
+
 		float maxLenFactor = 4.0f; // 한 셀 안에서 최대 길이 비율
 
 		for (int gy = spacing / 2; gy < height; gy += spacing) {
 			for (int gx = spacing / 2; gx < width; gx += spacing) {
 
 				ofVec2f pos(gx, gy);
+				ofVec2f diff = pos - center;
+				float distSqCircle = diff.lengthSquared();
+
+				if (clipFieldToCircle) {
+					if (distSqCircle > (MAIN_CIRCLE_RADIUS + 0) * (MAIN_CIRCLE_RADIUS + 0)) {
+						continue;
+					}
+				}
 				ofVec2f totalForce(0, 0);
 
 				// 이 지점에서의 블랙홀 합력 계산
@@ -332,12 +348,12 @@ void ofApp::draw() {
 
 					// 길이 스케일링: 힘의 크기를 픽셀 길이로 변환
 					float maxLen = spacing * maxLenFactor; // 주위 화살표와 안 겹치도록
-					float len = forceMag * fieldScale;
+					float len = forceMag * fieldScaleToUse;
 					len = ofClamp(len, 0.0f, maxLen);
 
 					// 애니메이션: 길이를 살짝 펄싱
-					float t = ofGetElapsedTimef();
-					float pulse = 0.8f + 0.2f * sin(t * 2.0f);
+					// float t = ofGetElapsedTimef();
+					// float pulse = 0.8f + 0.2f * sin(t * 2.0f);
 					// len *= pulse;
 
 					ofVec2f dirNorm = totalForce.getNormalized();
@@ -358,7 +374,6 @@ void ofApp::draw() {
 						// ofDrawTriangle(tip, left, right);
 					}
 
-
 					// 2) 화살표 끝의 하얀 동그라미는 drawFieldDots 가 true 일 때만
 					if (drawFieldDots) {
 						// ofSetColor(255, 255, 255, drawFieldArrows ? 120 : 200);
@@ -373,8 +388,6 @@ void ofApp::draw() {
 
 		ofPopStyle();
 	}
-
-
 
 	if (drawThings) {
 		for (auto & b : blackholes) {
@@ -407,7 +420,6 @@ void ofApp::draw() {
 		attractorFbo.end();
 		attractorFbo.draw(0, 0);
 		ofPopStyle();
-
 	}
 
 	// 원형 경계 시각화
@@ -664,6 +676,10 @@ void ofApp::onIndexScaleChanged(float & val) {
 	indexScale = val;
 }
 
+void ofApp::onFieldScaleChanged(float & val) {
+    fieldScale = val;   // 슬라이더 값 → 멤버 변수
+}
+
 void ofApp::onToggleChanged(bool & val) {
 	ampLatoo = val;
 
@@ -694,6 +710,10 @@ void ofApp::onToggleAttractor(bool & val) {
 
 void ofApp::onToggleMainCircle(bool & val) {
 	drawMainCircle = val;
+}
+
+void ofApp::onToggleFieldClip(bool & val) {
+	clipFieldToCircle = val;
 }
 
 //--------------------------------------------------------------
@@ -897,8 +917,8 @@ void ofApp::sendBlackholeStates() {
 		// float magnitude = std::abs(b.strength);
 		// msg.addFloatArg(magnitude);
 
-		// 4) 모드: 1 = attraction(인력), -1 = repulsion(척력)
-		int mode = (b.strength >= 0.0f) ? 1 : -1;
+		// 4) 모드: 1 = attraction(인력), 0 = repulsion(척력)
+		int mode = (b.strength >= 0.0f) ? 1 : 0;
 		msg.addIntArg(mode);
 
 		// 5) 화면상의 위치 (옵션: SC에서 위치 기반 매핑하고 싶을 때)
