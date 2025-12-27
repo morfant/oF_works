@@ -32,9 +32,10 @@ void ofApp::setup() {
 	timeScale = 0.03f;
 	indexScale = 0.05f;
 	fieldScale = 360.f;
-	drawAttractor = true;
+	drawAttractor = false;
 	drawFieldArrows = true;
 	drawFieldDots = true;
+	clipFieldToCircle = true;
 
 	attractorLayer.allocate(width, height, GL_RGBA);
 
@@ -512,27 +513,7 @@ void ofApp::updateParameters() {
 // Apply summed force of all blackholes (with Perlin-controlled strength)
 void ofApp::applyBlackholeForce() {
 	for (auto & m : movers) {
-
-		ofVec2f totalForce(0, 0);
-
-		for (auto & b : blackholes) {
-
-			ofVec2f dir = b.pos - m.pos;
-			float distSq = dir.lengthSquared();
-			float minDist = 1.0f; // 최소 거리
-			if (distSq < minDist * minDist) {
-				distSq = minDist * minDist;
-			}
-			if (distSq > 0.0001f) { // 0 나누기 방지
-				dir.normalize();
-				// 기본 1/r^2 에 각 블랙홀의 strength 를 곱해줌
-				float base = (10.0f * forceBaseScale) / distSq; // 2차 글로벌 스케일
-				float s = b.strength;
-				totalForce += dir * base * s;
-			}
-		}
-
-		m.applyForce(totalForce);
+		m.applyBlackholeForce(blackholes, forceBaseScale);
 	}
 }
 
@@ -651,15 +632,15 @@ void ofApp::drawUI() {
 
 	// ---- Debug Info: lat params & FPS ----
 	ofSetColor(255);
-	ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 420);
-	ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 440);
-	ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 460);
-	ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 480);
-	ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 500);
+	// ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 420);
+	// ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 440);
+	// ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 460);
+	// ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 480);
+	// ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 500);
 	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 520);
-	ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 540);
-	ofDrawBitmapStringHighlight("Seed mass: " + ofToString(seedMass, 3), 20, 560);
-	ofDrawBitmapStringHighlight("Movers: " + ofToString(movers.size()), 20, 580);
+	// ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 540);
+	// ofDrawBitmapStringHighlight("Seed mass: " + ofToString(seedMass, 3), 20, 560);
+	// ofDrawBitmapStringHighlight("Movers: " + ofToString(movers.size()), 20, 580);
 }
 
 void ofApp::onInitXChanged(float & val) {
@@ -799,8 +780,8 @@ void ofApp::keyPressed(int key) {
 		// 원 내부의 랜덤 위치로 이동
 		float angle = ofRandom(TWO_PI);
 		float rad = ofRandom(R);
-		m.pos.set(center.x + cos(angle) * rad,
-			center.y + sin(angle) * rad);
+		m.setPosition(ofVec2f(center.x + cos(angle) * rad,
+			center.y + sin(angle) * rad));
 		movers.push_back(m);
 
 		// 첫 번째로 생성된 mover 를 controller 로 사용
