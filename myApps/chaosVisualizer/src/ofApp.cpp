@@ -3,6 +3,11 @@
 
 static const float MAIN_CIRCLE_RADIUS = 400.0f; // 기존 220.0f 에서 확장된 원 경계 반지름
 
+// --- Dynamic CorrectionFactor (Perlin + age envelope) ---
+// Envelope peaks at half-cycle and returns to 0 at the end of each cycle.
+static const float CORRECTION_CYCLE_SEC = 60.0f;   // one full grow->shrink cycle duration
+static const float CORRECTION_NOISE_RATE = 0.25f;  // Perlin time rate
+
 //--------------------------------------------------------------
 void ofApp::setup() {
 	ofSetFrameRate(60);
@@ -236,12 +241,35 @@ void ofApp::update() {
 		moverCollisionState.assign(movers.size(), std::vector<bool>(movers.size(), false));
 	}
 
-	// movers끼리 간단한 충돌 처리 (GUI에서 correctionFactor 조절)
+	// --- Dynamic correctionFactor: Perlin noise scaled by an age envelope (0 -> max -> 0).
+	// The envelope grows until half of the cycle, then shrinks in the second half.
+	float dynamicCorrectionFactor = 1.0f;
+	{
+		// Use controller mover age (firstMoverAge) as time.
+		float t = firstMoverAge;
+		float phase = 0.0f;
+		if (CORRECTION_CYCLE_SEC > 0.0001f) {
+			phase = fmod(t, CORRECTION_CYCLE_SEC) / CORRECTION_CYCLE_SEC; // 0..1
+		}
+
+		// Smooth 0->1->0 envelope, peak at phase=0.5
+		float env = sin(PI * phase); // 0..1..0
+		float amp = 5.0f * env;      // amplitude in [0,5]
+
+		// Perlin noise in [-1,1]
+		float n = ofNoise(t * CORRECTION_NOISE_RATE);
+		float signedN = ofMap(n, 0.0f, 1.0f, -1.0f, 1.0f);
+
+		// Final correction factor in [-5, 5]
+		dynamicCorrectionFactor = ofClamp(signedN * amp, -5.0f, 5.0f);
+	}
+
+	// movers끼리 간단한 충돌 처리 (correctionFactor는 dynamicCorrectionFactor 사용)
 	for (std::size_t i = 0; i < movers.size(); ++i) {
 		for (std::size_t j = i + 1; j < movers.size(); ++j) {
 
 			// 이번 프레임에서의 충돌 여부
-			bool isCollidingNow = movers[i].collideWith(movers[j], correctionSlider);
+			bool isCollidingNow = movers[i].collideWith(movers[j], dynamicCorrectionFactor);
 
 			// 이전 프레임에서의 충돌 상태
 			bool wasColliding = moverCollisionState[i][j];
@@ -630,17 +658,23 @@ void ofApp::drawUI() {
 	// UI
 	gui.draw();
 
-	// ---- Debug Info: lat params & FPS ----
+	// ---- Debug Info: FPS & counts ----
 	ofSetColor(255);
-	// ofDrawBitmapStringHighlight("Latoocarfian Parameters:", 20, 420);
-	// ofDrawBitmapStringHighlight("lat_a: " + ofToString(lat_a, 2), 20, 440);
-	// ofDrawBitmapStringHighlight("lat_b: " + ofToString(lat_b, 2), 20, 460);
-	// ofDrawBitmapStringHighlight("lat_c: " + ofToString(lat_c, 2), 20, 480);
-	// ofDrawBitmapStringHighlight("lat_d: " + ofToString(lat_d, 2), 20, 500);
 	ofDrawBitmapStringHighlight("FPS: " + ofToString(ofGetFrameRate(), 1), 20, 520);
-	// ofDrawBitmapStringHighlight("Seeds: " + ofToString(seeds.size()), 20, 540);
-	// ofDrawBitmapStringHighlight("Seed mass: " + ofToString(seedMass, 3), 20, 560);
-	// ofDrawBitmapStringHighlight("Movers: " + ofToString(movers.size()), 20, 580);
+	ofDrawBitmapStringHighlight("Movers: " + ofToString(movers.size()), 20, 540);
+
+	// Dynamic CorrectionFactor preview (Perlin * age envelope)
+	float t = firstMoverAge;
+	float phase = 0.0f;
+	if (CORRECTION_CYCLE_SEC > 0.0001f) {
+		phase = fmod(t, CORRECTION_CYCLE_SEC) / CORRECTION_CYCLE_SEC;
+	}
+	float env = sin(PI * phase);
+	float amp = 5.0f * env;
+	float n = ofNoise(t * CORRECTION_NOISE_RATE);
+	float signedN = ofMap(n, 0.0f, 1.0f, -1.0f, 1.0f);
+	float dynamicCorrectionFactor = ofClamp(signedN * amp, -5.0f, 5.0f);
+	ofDrawBitmapStringHighlight("CorrectionFactor(dyn): " + ofToString(dynamicCorrectionFactor, 3), 20, 560);
 }
 
 void ofApp::onInitXChanged(float & val) {

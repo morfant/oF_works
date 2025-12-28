@@ -3,6 +3,8 @@
 #include "Blackhole.h"
 #include "Seed.h"
 #include "ofMain.h"
+#include <algorithm>
+#include <cmath>
 
 static ofVec2f computeBlackholeForceAt(const ofVec2f& position,
 	const std::vector<Blackhole>& blackholes,
@@ -28,7 +30,7 @@ static ofVec2f computeBlackholeForceAt(const ofVec2f& position,
 }
 
 Mover::Mover(float x, float y, float m)
-    : pos(x, y), vel(ofRandom(-1, 1), ofRandom(-1, 1)), acc(0, 0), diameter(40), mass(m) {
+    : pos(x, y), vel(ofRandom(-1, 1), ofRandom(-1, 1)), acc(0, 0), diameter(200), mass(m) {
 	if (USE_SOFT_BODY) {
 		initSoftBody(SOFT_POINT_COUNT, diameter * 0.5f);
 	}
@@ -105,20 +107,55 @@ void Mover::checkEdges(bool blocked) {
 // 원형 경계 안에서 튕기기 (Ball::bounceOnCircleBoundary 에서 가져온 로직)
 void Mover::bounceOnCircleBoundary(const ofVec2f& center, float R) {
 	if (USE_SOFT_BODY && !softPoints.empty()) {
-		for (auto & p : softPoints) {
-			ofVec2f d = p.pos - center;
-			float dist = d.length();
+		// Soft-body boundary handling: push the whole body out using the worst-penetrating point,
+		// and reflect outward velocity along the boundary normal. This avoids per-point "snapping"
+		// that can scramble point order and cause flips.
+		ofVec2f bodyCenter(0, 0);
+		for (const auto & sp : softPoints) {
+			bodyCenter += sp.pos;
+		}
+		bodyCenter /= static_cast<float>(softPoints.size());
 
-			if (dist > R) {
-				if (dist == 0.0f) {
-					continue;
-				}
-				ofVec2f n = d / dist;
-				float dot = p.vel.dot(n);
-				p.vel = p.vel - 2.0f * dot * n;
-				p.pos = center + n * R;
+		float maxPenetration = 0.0f;
+		ofVec2f hitNormal(0, 0);
+		for (const auto & sp : softPoints) {
+			ofVec2f d = sp.pos - center;
+			float dist = d.length();
+			float pen = dist - R;
+			if (pen > maxPenetration && dist > 0.0001f) {
+				maxPenetration = pen;
+				hitNormal = d / dist;
 			}
 		}
+
+		if (maxPenetration > 0.0f) {
+			// Translate the entire soft body back inside the boundary.
+			ofVec2f delta = -hitNormal * maxPenetration;
+			translateSoftPoints(delta);
+
+			// Reflect only the outward component of velocity along the collision normal.
+			for (auto & sp : softPoints) {
+				float vn = sp.vel.dot(hitNormal);
+				if (vn > 0.0f) {
+					sp.vel = sp.vel - 2.0f * vn * hitNormal;
+				}
+			}
+		}
+
+		// Keep a consistent winding/order to prevent self-intersections (flip).
+		// Sort by angle around the current soft-body center.
+		bodyCenter.set(0, 0);
+		for (const auto & sp : softPoints) {
+			bodyCenter += sp.pos;
+		}
+		bodyCenter /= static_cast<float>(softPoints.size());
+		std::sort(softPoints.begin(), softPoints.end(),
+			[bodyCenter](const SoftPoint & a, const SoftPoint & b) {
+				float aa = std::atan2(a.pos.y - bodyCenter.y, a.pos.x - bodyCenter.x);
+				float bb = std::atan2(b.pos.y - bodyCenter.y, b.pos.x - bodyCenter.x);
+				return aa < bb;
+			});
+
 		syncCenterFromSoftPoints();
 		return;
 	}
@@ -305,6 +342,35 @@ void Mover::updateSoftBody() {
 		p.pos += p.vel;
 		p.acc.set(0, 0);
 	}
+
+	// Gentle safety belt: keep point order consistent and prevent extreme radius collapse/expansion.
+	// 1) Clamp radius to a reasonable band (still allows jelly deformation).
+	ofVec2f bodyCenter(0, 0);
+	for (const auto & sp : softPoints) {
+		bodyCenter += sp.pos;
+	}
+	bodyCenter /= static_cast<float>(softPoints.size());
+
+	const float minR = softRestRadius * 0.60f;
+	const float maxR = softRestRadius * 1.40f;
+	for (auto & sp : softPoints) {
+		ofVec2f d = sp.pos - bodyCenter;
+		float dist = d.length();
+		if (dist > 0.0001f) {
+			float clamped = ofClamp(dist, minR, maxR);
+			if (clamped != dist) {
+				sp.pos = bodyCenter + (d / dist) * clamped;
+			}
+		}
+	}
+
+	// 2) Sort by angle around center to keep a consistent winding (prevents flips/self-intersection).
+	std::sort(softPoints.begin(), softPoints.end(),
+		[bodyCenter](const SoftPoint & a, const SoftPoint & b) {
+			float aa = std::atan2(a.pos.y - bodyCenter.y, a.pos.x - bodyCenter.x);
+			float bb = std::atan2(b.pos.y - bodyCenter.y, b.pos.x - bodyCenter.x);
+			return aa < bb;
+		});
 
 	syncCenterFromSoftPoints();
 }
